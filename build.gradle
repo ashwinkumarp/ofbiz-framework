@@ -211,10 +211,10 @@ dependencies {
     compile 'org.apache.sshd:sshd-core:1.7.0'
     compile 'org.apache.tika:tika-core:1.28.4'
     compile 'org.apache.tika:tika-parsers:1.28.4'
-    compile 'org.apache.tomcat:tomcat-catalina-ha:9.0.86'
-    compile 'org.apache.tomcat:tomcat-catalina:9.0.86'
-    compile 'org.apache.tomcat:tomcat-jasper:9.0.86'
-    compile 'org.apache.tomcat:tomcat-tribes:9.0.86'
+    compile 'org.apache.tomcat:tomcat-catalina-ha:9.0.91'
+    compile 'org.apache.tomcat:tomcat-catalina:9.0.91'
+    compile 'org.apache.tomcat:tomcat-jasper:9.0.91'
+    compile 'org.apache.tomcat:tomcat-tribes:9.0.91'
     compile 'org.apache.xmlgraphics:fop:2.3'
     compile 'org.codehaus.groovy:groovy-all:2.4.13' // Remember to change the version number in javadoc.options block
     compile 'org.freemarker:freemarker:2.3.31' // Remember to change the version number in FreeMarkerWorker class when upgrading
@@ -374,25 +374,6 @@ eclipse.classpath.file.whenMerged { classpath ->
     }
 }
 tasks.eclipse.dependsOn(cleanEclipse)
-
-/* OWASP plugin
- *
- * If project property "enableOwasp" is flagged then
- * gradle will download required dependencies and
- * activate Gradle's OWASP plugin and its related tasks.
- *
- * Syntax: gradlew -PenableOwasp dependencyCheckAnalyze
- */
-buildscript {
-    if (project.hasProperty('enableOwasp')) {
-        dependencies {
-            classpath 'org.owasp:dependency-check-gradle:3.0.2'
-        }
-    }
-}
-if (project.hasProperty('enableOwasp')) {
-    apply plugin: 'org.owasp.dependencycheck'
-}
 
 /* ========================================================
  * Tasks
