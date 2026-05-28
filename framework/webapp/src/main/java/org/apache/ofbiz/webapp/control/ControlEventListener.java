@@ -22,9 +22,9 @@ import java.sql.Timestamp;
 import java.util.Enumeration;
 import java.util.Map;
 
-import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionEvent;
-import javax.servlet.http.HttpSessionListener;
+import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionListener;
 
 import org.apache.ofbiz.base.util.Debug;
 import org.apache.ofbiz.base.util.UtilDateTime;
@@ -34,6 +34,7 @@ import org.apache.ofbiz.base.util.UtilValidate;
 import org.apache.ofbiz.entity.Delegator;
 import org.apache.ofbiz.entity.GenericEntityException;
 import org.apache.ofbiz.entity.GenericValue;
+import org.apache.ofbiz.entity.model.ModelEntity;
 import org.apache.ofbiz.entity.serialize.XmlSerializer;
 import org.apache.ofbiz.entity.transaction.TransactionUtil;
 import org.apache.ofbiz.entity.util.EntityQuery;
@@ -155,7 +156,10 @@ public class ControlEventListener implements HttpSessionListener {
             Debug.logInfo("--------------------------------------------------------------------", MODULE);
             if (visit != null) {
                 Debug.logInfo("Visit ID       : " + visit.getString("visitId"), MODULE);
-                Debug.logInfo("Party ID       : " + visit.getString("partyId"), MODULE);
+                ModelEntity modelVisit = visit.getModelEntity();
+                if (modelVisit.isField("partyId")) {
+                    Debug.logInfo("Party ID       : " + visit.getString("partyId"), MODULE);
+                }
                 Debug.logInfo("Client IP      : " + visit.getString("clientIpAddress"), MODULE);
                 Debug.logInfo("Client Host    : " + visit.getString("clientHostName"), MODULE);
                 Debug.logInfo("Client User    : " + visit.getString("clientUser"), MODULE);

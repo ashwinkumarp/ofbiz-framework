@@ -22,13 +22,13 @@ under the License.
 <#assign contextPath = request.getContextPath()>
 <#assign displayApps = Static["org.apache.ofbiz.webapp.WebAppCache"].getShared().getAppBarWebInfos(ofbizServerName, "main")>
 <#assign displaySecondaryApps = Static["org.apache.ofbiz.webapp.WebAppCache"].getShared().getAppBarWebInfos(ofbizServerName, "secondary")>
-<#if person?has_content>
+<#--<#if person?has_content>
     <#assign avatarList = EntityQuery.use(delegator).from("PartyContent").where("partyId",  person.partyId!, "partyContentTypeId", "LGOIMGURL").queryList()!>
     <#if avatarList?has_content>
         <#assign avatar = Static["org.apache.ofbiz.entity.util.EntityUtil"].getFirst(avatarList)>
         <#assign avatarDetail = EntityQuery.use(delegator).from("PartyContentDetail").where("partyId", person.partyId!, "contentId", avatar.contentId!).queryFirst()!>
     </#if>
-</#if>
+</#if>-->
 <body>
 <#include "component://common-theme/template/ImpersonateBanner.ftl"/>
 <div id="wait-spinner" class="hidden">
@@ -67,7 +67,7 @@ under the License.
                         </#if>
                         <#assign thisApp = StringUtil.wrapString(thisApp)>
                         <#assign thisURL = thisApp>
-                        <#if thisApp != "/">
+                        <#if thisApp != "/" && thisApp != "/rest">
                             <#assign thisURL = thisURL + "/control/main">
                         </#if>
                         <#if layoutSettings.suppressTab?exists && display.name == layoutSettings.suppressTab>
@@ -111,7 +111,7 @@ under the License.
                         </#if>
                         <#assign thisApp = StringUtil.wrapString(thisApp)>
                         <#assign thisURL = thisApp>
-                        <#if thisApp != "/">
+                        <#if thisApp != "/" && thisApp != "/rest">
                             <#assign thisURL = thisURL + "/control/main">
                         </#if>
                         <#if appCount<=appMax>
@@ -157,7 +157,7 @@ under the License.
                     </#if>
                     <#assign thisApp = StringUtil.wrapString(thisApp)>
                     <#assign thisURL = thisApp>
-                    <#if thisApp != "/">
+                    <#if thisApp != "/" && thisApp != "/rest">
                         <#assign thisURL = thisURL + "/control/main">
                     </#if>
                     <#if layoutSettings.suppressTab?exists && display.name == layoutSettings.suppressTab>
@@ -200,7 +200,7 @@ under the License.
                     </#if>
                     <#assign thisApp = StringUtil.wrapString(thisApp)>
                     <#assign thisURL = thisApp>
-                    <#if thisApp != "/">
+                    <#if thisApp != "/" && thisApp != "/rest">
                         <#assign thisURL = thisURL + "/control/main">
                     </#if>
                     <#if appMax < appCount>
@@ -231,7 +231,7 @@ under the License.
             <#assign thisApp = currentMoreApp.getContextRoot()>
             <#assign thisApp = StringUtil.wrapString(thisApp)>
             <#assign thisURL = thisApp>
-            <#if thisApp != "/">
+            <#if thisApp != "/" && thisApp != "/rest">
                 <#assign thisURL = thisURL + "/control/main">
             </#if>
             <li class="app-btn selected">

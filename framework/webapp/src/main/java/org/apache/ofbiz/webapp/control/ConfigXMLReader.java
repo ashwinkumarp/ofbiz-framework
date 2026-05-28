@@ -35,8 +35,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import javax.servlet.ServletContext;
-
 import org.apache.ofbiz.base.component.ComponentConfig.WebappInfo;
 import org.apache.ofbiz.base.location.FlexibleLocation;
 import org.apache.ofbiz.base.metrics.Metrics;
@@ -57,6 +55,8 @@ import org.apache.ofbiz.base.util.collections.MultivaluedMapContextAdapter;
 import org.apache.ofbiz.security.CsrfUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+
+import jakarta.servlet.ServletContext;
 
 /**
  * ConfigXMLReader.java - Reads and parses the XML site config files.
@@ -404,7 +404,8 @@ public final class ConfigXMLReader {
         }
 
         /**
-         * XXX: Keep it for backward compatibility until moving everything to 鈥榞etRequestMapMultiMap鈥�.  @return the request map map
+         * XXX: Keep it for backward compatibility until moving everything to getRequestMapMultiMap.
+         *   @return the request map
          */
         public Map<String, RequestMap> getRequestMapMap() {
             return new MultivaluedMapContextAdapter<>(getRequestMapMultiMap());
@@ -1044,6 +1045,7 @@ public final class ConfigXMLReader {
         private String strictTransportSecurity;
         private String description;
         private boolean noCache = false;
+        private boolean secureContext = true;
         private boolean securityAuth = false;
 
         /**
@@ -1106,6 +1108,15 @@ public final class ConfigXMLReader {
         }
 
         /**
+         * Is secureContext boolean.
+         *
+         * @return the boolean
+         */
+        public boolean isSecureContext() {
+            return secureContext;
+        }
+
+        /**
          * Gets type.
          * @return the type
          */
@@ -1144,7 +1155,8 @@ public final class ConfigXMLReader {
             this.info = viewMapElement.getAttribute("info");
             this.contentType = viewMapElement.getAttribute("content-type");
             this.noCache = "true".equals(viewMapElement.getAttribute("no-cache"));
-            this.securityAuth = "true".equals(viewMapElement.getAttribute("auth"));
+            this.secureContext = "true".equals(viewMapElement.getAttribute("secure-context"));
+            this.securityAuth = "true".equals(viewMapElement.getAttribute("auth")) || !this.secureContext;
             this.encoding = viewMapElement.getAttribute("encoding");
             this.xFrameOption = viewMapElement.getAttribute("x-frame-options");
             this.strictTransportSecurity = viewMapElement.getAttribute("strict-transport-security");

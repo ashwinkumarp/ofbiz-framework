@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="UTF-8" ?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one
   or more contributor license agreements.  See the NOTICE file
@@ -20,8 +19,8 @@
 
 <test-suite suite-name="basetests"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="https://ofbiz.apache.org/dtds/test-suite.xsd">
-    <test-group case-name="basetests">
+        xsi:noNamespaceSchemaLocation="http://ofbiz.apache.org/dtds/test-suite.xsd">
+    <test-case case-name="basesimpletests">
         <junit-test-suite class-name="org.apache.ofbiz.base.test.SimpleTests"/>
-    </test-group>
+    </test-case>
 </test-suite>

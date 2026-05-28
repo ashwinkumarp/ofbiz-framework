@@ -27,16 +27,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import com.ibm.icu.util.Calendar;
 import org.apache.ofbiz.base.util.Debug;
@@ -47,6 +47,7 @@ import org.apache.ofbiz.base.util.UtilGenerics;
 import org.apache.ofbiz.base.util.UtilHttp;
 import org.apache.ofbiz.base.util.UtilMisc;
 import org.apache.ofbiz.base.util.UtilProperties;
+import org.apache.ofbiz.base.util.UtilRandom;
 import org.apache.ofbiz.base.util.UtilValidate;
 import org.apache.ofbiz.base.util.string.FlexibleStringExpander;
 import org.apache.ofbiz.webapp.control.RequestHandler;
@@ -61,6 +62,7 @@ import org.apache.ofbiz.widget.model.ModelTheme;
 import org.apache.ofbiz.widget.renderer.FormRenderer;
 import org.apache.ofbiz.widget.renderer.Paginator;
 import org.apache.ofbiz.widget.renderer.VisualTheme;
+import org.apache.ofbiz.widget.renderer.macro.model.GroupOption;
 import org.apache.ofbiz.widget.renderer.macro.model.Option;
 import org.apache.ofbiz.widget.renderer.macro.renderable.RenderableFtl;
 import org.apache.ofbiz.widget.renderer.macro.renderable.RenderableFtlMacroCall;
@@ -107,16 +109,13 @@ public final class RenderableFtlFormElementsBuilder {
 
     public RenderableFtl asterisks(final Map<String, Object> context, final ModelFormField modelFormField) {
         String requiredField = "false";
-        String requiredStyle = "";
         if (modelFormField.getRequiredField()) {
             requiredField = "true";
-            requiredStyle = modelFormField.getRequiredFieldStyle();
         }
 
         return RenderableFtlMacroCall.builder()
                 .name("renderAsterisks")
                 .stringParameter("requiredField", requiredField)
-                .stringParameter("requiredStyle", requiredStyle)
                 .build();
     }
 
@@ -155,7 +154,7 @@ public final class RenderableFtlFormElementsBuilder {
         boolean ajaxEnabled = inPlaceEditor != null && javaScriptEnabled;
         if (UtilValidate.isNotEmpty(description) && size > 0 && description.length() > size) {
             title = description;
-            description = description.substring(0, size - 8) + "..." + description.substring(description.length() - 5);
+            description = StringUtil.truncateEncodedStringToLength(description, size);
         }
 
         final RenderableFtlMacroCallBuilder builder = RenderableFtlMacroCall.builder()
@@ -252,12 +251,31 @@ public final class RenderableFtlFormElementsBuilder {
                                    final boolean javaScriptEnabled) {
         ModelFormField modelFormField = textField.getModelFormField();
         String name = modelFormField.getParameterName(context);
-        String className = "";
+        String type = textField.getType();
+        if (UtilValidate.isEmpty(type)) {
+            type = "text";
+        }
+        String pattern = "";
+        if (List.of("text", "email", "url", "tel").contains(type)) {
+            pattern = textField.getPattern();
+        }
+        String step = "";
+        String min = "";
+        String max = "";
+        if (List.of("number", "range").contains(type)) {
+            min = textField.getMin();
+            max = textField.getMax();
+            step = textField.getStep();
+            if (UtilValidate.isEmpty(step)) {
+                step = "any";
+            }
+        }
+        List<String> classes = new ArrayList<>();
         String alert = "false";
         String mask = "";
         String placeholder = textField.getPlaceholder(context);
         if (UtilValidate.isNotEmpty(modelFormField.getWidgetStyle())) {
-            className = modelFormField.getWidgetStyle();
+            classes.add(modelFormField.getWidgetStyle());
             if (modelFormField.shouldBeRed(context)) {
                 alert = "true";
             }
@@ -274,14 +292,13 @@ public final class RenderableFtlFormElementsBuilder {
         String clientAutocomplete = "false";
         //check for required field style on single forms
         if ("single".equals(modelFormField.getModelForm().getType()) && modelFormField.getRequiredField()) {
+            // kept for backward compatibility with existing CSS/JS
+            // maybe unused if jQuery Validation is no longer used
+            // for styling we should rely on "required" attribute
+            classes.add("required");
             String requiredStyle = modelFormField.getRequiredFieldStyle();
-            if (UtilValidate.isEmpty(requiredStyle)) {
-                requiredStyle = "required";
-            }
-            if (UtilValidate.isEmpty(className)) {
-                className = requiredStyle;
-            } else {
-                className = requiredStyle + " " + className;
+            if (UtilValidate.isNotEmpty(requiredStyle)) {
+                classes.add(requiredStyle);
             }
         }
         List<ModelForm.UpdateArea> updateAreas = modelFormField.getOnChangeUpdateAreas();
@@ -300,7 +317,12 @@ public final class RenderableFtlFormElementsBuilder {
         return RenderableFtlMacroCall.builder()
                 .name("renderTextField")
                 .stringParameter("name", name)
-                .stringParameter("className", className)
+                .stringParameter("className", String.join(" ", classes))
+                .stringParameter("type", type)
+                .stringParameter("pattern", pattern)
+                .stringParameter("step", step)
+                .stringParameter("min", min)
+                .stringParameter("max", max)
                 .stringParameter("alert", alert)
                 .stringParameter("value", value)
                 .stringParameter("textSize", textSize)
@@ -310,6 +332,7 @@ public final class RenderableFtlFormElementsBuilder {
                 .stringParameter("action", action != null ? action : "")
                 .booleanParameter("disabled", disabled)
                 .booleanParameter("readonly", readonly)
+                .booleanParameter("required", modelFormField.getRequiredField())
                 .stringParameter("clientAutocomplete", clientAutocomplete)
                 .stringParameter("ajaxUrl", ajaxUrl)
                 .booleanParameter("ajaxEnabled", ajaxEnabled)
@@ -355,9 +378,7 @@ public final class RenderableFtlFormElementsBuilder {
 
         if (textareaField.getVisualEditorEnable()) {
             builder.booleanParameter("visualEditorEnable", true);
-
-            String buttons = textareaField.getVisualEditorButtons(context);
-            builder.stringParameter("buttons", UtilValidate.isEmpty(buttons) ? "maxi" : buttons);
+            builder.stringParameter("buttons", textareaField.getVisualEditorButtons(context));
         }
 
         if (textareaField.isReadOnly()) {
@@ -655,6 +676,109 @@ public final class RenderableFtlFormElementsBuilder {
         return macroCallBuilder.build();
     }
 
+    public RenderableFtl dateRangePicker(final Map<String, Object> context, final ModelFormField.DateRangePickerField dateRangePickerField) {
+        final ModelFormField modelFormField = dateRangePickerField.getModelFormField();
+        final ModelForm modelForm = modelFormField.getModelForm();
+        final String name = modelFormField.getParameterName(context);
+        final Locale locale = (Locale) context.get("locale");
+        String className = UtilFormatOut.checkNull(dateRangePickerField.getModelFormField().getWidgetStyle());
+
+        String event = "";
+        String action = "";
+        if (UtilValidate.isNotEmpty(modelFormField.getEvent()) && UtilValidate.isNotEmpty(modelFormField.getAction(context))) {
+            event = modelFormField.getEvent();
+            action = modelFormField.getAction(context);
+        }
+
+        final Map<String, String> uiLabelMap = UtilGenerics.cast(context.get("uiLabelMap"));
+        if (uiLabelMap == null) {
+            Debug.logWarning("Could not find uiLabelMap in context", MODULE);
+        }
+
+        final Function<String, String> getOpLabel = (label) -> UtilProperties.getMessage("conditionalUiLabels", label, locale);
+
+        String applyLabel = Optional.ofNullable(dateRangePickerField.getApplyLabel(context))
+                .filter(s -> !s.isEmpty())
+                .orElse(UtilProperties.getMessage("CommonUiLabels", "CommonApply", locale));
+        String cancelLabel = Optional.ofNullable(dateRangePickerField.getCancelLabel(context))
+                .filter(s -> !s.isEmpty())
+                .orElse(UtilProperties.getMessage("CommonUiLabels", "CommonCancel", locale));
+        String clearTitle = Optional.ofNullable(dateRangePickerField.getClearTitle(context))
+                .filter(s -> !s.isEmpty())
+                .orElse(UtilProperties.getMessage("CommonUiLabels", "CommonClear", locale));
+
+        final RenderableFtlMacroCallBuilder macroCallBuilder = RenderableFtlMacroCall.builder()
+                .name("renderDateRangePicker")
+                .stringParameter("name", name)
+                .stringParameter("id", modelFormField.getCurrentContainerId(context))
+                .stringParameter("className", className)
+                .stringParameter("formName", FormRenderer.getCurrentFormName(modelForm, context))
+                .stringParameter("event", event)
+                .stringParameter("action", action)
+                .stringParameter("locale", locale.toString())
+                .stringParameter("conditionGroup", modelFormField.getConditionGroup())
+                .stringParameter("tabindex", modelFormField.getTabindex())
+
+                .booleanParameter("alwaysShowCalendars", dateRangePickerField.getAlwaysShowCalendars())
+                .stringParameter("applyButtonClasses", dateRangePickerField.getApplyButtonClasses(context))
+                .stringParameter("applyLabel", applyLabel)
+                .booleanParameter("autoApply", dateRangePickerField.getAutoApply())
+                .stringParameter("buttonClasses", dateRangePickerField.getButtonClasses(context))
+                .stringParameter("cancelButtonClasses", dateRangePickerField.getCancelButtonClasses(context))
+                .stringParameter("cancelLabel", cancelLabel)
+                .stringParameter("clearTitle", clearTitle)
+                .stringParameter("drops", dateRangePickerField.getDrops())
+                .booleanParameter("linkedCalendars", dateRangePickerField.getLinkedCalendars())
+                .stringParameter("maxSpan", Optional.ofNullable(dateRangePickerField.getMaxSpan()).map(Objects::toString).orElse(""))
+                .stringParameter("maxYear", Optional.ofNullable(dateRangePickerField.getMaxYear()).map(Objects::toString).orElse(""))
+                .stringParameter("minYear", Optional.ofNullable(dateRangePickerField.getMinYear()).map(Objects::toString).orElse(""))
+                .stringParameter("opens", dateRangePickerField.getOpens())
+                .stringParameter("rangeThisWeekLabel", getOpLabel.apply("this_week"))
+                .stringParameter("rangeLastWeekLabel", getOpLabel.apply("last_week"))
+                .stringParameter("rangeNextWeekLabel", getOpLabel.apply("next_week"))
+                .stringParameter("rangeThisMonthLabel", getOpLabel.apply("this_month"))
+                .stringParameter("rangeLastMonthLabel", getOpLabel.apply("last_month"))
+                .stringParameter("rangeNextMonthLabel", getOpLabel.apply("next_month"))
+                .booleanParameter("showDropdowns", dateRangePickerField.getShowDropdowns())
+                .booleanParameter("showIsoWeekNumbers", dateRangePickerField.getShowIsoWeekNumbers())
+                .booleanParameter("showRanges", dateRangePickerField.getShowRanges())
+                .booleanParameter("showWeekNumbers", dateRangePickerField.getShowWeekNumbers())
+                .booleanParameter("singleDatePicker", dateRangePickerField.getSingleDatePicker())
+                .booleanParameter("timePicker", dateRangePickerField.getTimePicker())
+                .booleanParameter("timePicker24Hour", dateRangePickerField.getTimePicker24Hour())
+                .stringParameter("timePickerIncrement",
+                        Optional.ofNullable(dateRangePickerField.getTimePickerIncrement()).map(Objects::toString).orElse(""))
+                .booleanParameter("timePickerSeconds", dateRangePickerField.getTimePickerSeconds());
+
+        macroCallBuilder.stringParameter("alert", "false");
+        if (UtilValidate.isNotEmpty(modelFormField.getWidgetStyle())) {
+            macroCallBuilder.stringParameter("className", modelFormField.getWidgetStyle());
+            if (modelFormField.shouldBeRed(context)) {
+                macroCallBuilder.stringParameter("alert", "true");
+            }
+        }
+
+        macroCallBuilder
+                .stringParameter("value", modelFormField.getEntry(context, dateRangePickerField.getDefaultValue(context)))
+                .stringParameter("value2", modelFormField.getEntry(context));
+
+        if (context.containsKey("parameters")) {
+            final Map<String, Object> parameters = UtilGenerics.cast(context.get("parameters"));
+            if (parameters.containsKey(name + "_fld0_value")) {
+                macroCallBuilder.stringParameter("value", (String) parameters.get(name + "_fld0_value"));
+            }
+            if (parameters.containsKey(name + "_fld1_value")) {
+                macroCallBuilder.stringParameter("value2", (String) parameters.get(name + "_fld1_value"));
+            }
+        }
+
+        if (UtilValidate.isNotEmpty(modelFormField.getTitleStyle())) {
+            macroCallBuilder.stringParameter("titleStyle", modelFormField.getTitleStyle());
+        }
+
+        return macroCallBuilder.build();
+    }
+
     public RenderableFtl makeHyperlinkString(final ModelFormField.SubHyperlink subHyperlink,
                                              final Map<String, Object> context) {
         if (subHyperlink == null || !subHyperlink.shouldUse(context)) {
@@ -730,7 +854,7 @@ public final class RenderableFtlFormElementsBuilder {
 
         } else {
             if ("layered-modal".equals(realLinkType)) {
-                String uniqueItemName = "Modal_".concat(UUID.randomUUID().toString().replace("-", "_"));
+                String uniqueItemName = UtilRandom.getUnique("Modal_", true);
                 String width = (String) request.getAttribute("width");
                 if (UtilValidate.isEmpty(width)) {
                     width = String.valueOf(modelTheme.getLinkDefaultLayeredModalWidth());
@@ -797,7 +921,7 @@ public final class RenderableFtlFormElementsBuilder {
             }
             if (UtilValidate.isNotEmpty(description) && size > 0 && description.length() > size) {
                 title = description;
-                description = description.substring(0, size) + "…";
+                description = StringUtil.truncateEncodedStringToLength(description, size);
             } else if (UtilValidate.isNotEmpty(request.getAttribute("title"))) {
                 title = request.getAttribute("title").toString();
             }
@@ -928,6 +1052,7 @@ public final class RenderableFtlFormElementsBuilder {
         }
 
         final var allOptionValues = dropDownField.getAllOptionValues(context, WidgetWorker.getDelegator(context));
+        final var allGroupValues = dropDownField.getGroupOptions();
         final var explicitDescription =
                 // Populate explicitDescription with the description from the option associated with the current value.
                 allOptionValues.stream()
@@ -957,15 +1082,11 @@ public final class RenderableFtlFormElementsBuilder {
                             : UtilMisc.toList(currentValue))
                         : Collections.emptyList();
 
-        var optionsList = allOptionValues.stream()
-                .map(optionValue -> {
-                    var encodedKey = encode(optionValue.getKey(), modelFormField, context);
-                    var truncatedDescription = truncate(optionValue.getDescription(), textSizeOptional);
-                    var selected = currentValuesList.contains(optionValue.getKey());
-
-                    return new Option(encodedKey, truncatedDescription, selected);
-                })
-                .collect(Collectors.toList());
+        var optionsList = new ArrayList<>();
+        if (UtilValidate.isNotEmpty(allGroupValues)) {
+            optionsList.addAll(populateGroupAndOptions(context, allGroupValues, modelFormField, textSizeOptional, currentValuesList));
+        }
+        optionsList.addAll(populateOptions(context, allOptionValues, modelFormField, textSizeOptional, currentValuesList));
 
         builder.objectParameter("options", optionsList);
 
@@ -987,6 +1108,43 @@ public final class RenderableFtlFormElementsBuilder {
         }
 
         return builder.build();
+    }
+
+    private List<Object> populateGroupAndOptions(Map<String, Object> context, List<ModelFormField.GroupOptions> allGroupOptions,
+                                         ModelFormField modelFormField, Optional<Integer> textSizeOptional, List<String> currentValuesList) {
+        if (UtilValidate.isEmpty(allGroupOptions)) {
+            return new ArrayList<>();
+        }
+        return UtilGenerics.cast(allGroupOptions.stream()
+                .map(groupOptions -> {
+                    var groupOptionId = groupOptions.getId(context);
+                    var truncatedDescription = truncate(groupOptions.getDescription(context), textSizeOptional);
+                    var widgetStyle = groupOptions.getWidgetStyle(context);
+                    List<Object> optionsInGroupList = new ArrayList<>();
+                    optionsInGroupList.addAll(populateGroupAndOptions(context,
+                            groupOptions.getGroupOptions(),
+                            modelFormField, textSizeOptional, currentValuesList));
+                    optionsInGroupList.addAll(populateOptions(context,
+                            groupOptions.getAllOptionValues(context, WidgetWorker.getDelegator(context)),
+                            modelFormField, textSizeOptional, currentValuesList));
+                    return new GroupOption(groupOptionId, truncatedDescription, widgetStyle, optionsInGroupList);
+                })
+        .toList());
+    }
+    private List<Object> populateOptions(Map<String, Object> context, List<ModelFormField.OptionValue> allOptionValues,
+                                         ModelFormField modelFormField, Optional<Integer> textSizeOptional, List<String> currentValuesList) {
+        if (UtilValidate.isEmpty(allOptionValues)) {
+            return new ArrayList<>();
+        }
+        return UtilGenerics.cast(allOptionValues.stream()
+                .map(optionValue -> {
+                    var encodedKey = encode(optionValue.getKey(), modelFormField, context);
+                    var truncatedDescription = truncate(optionValue.getDescription(), textSizeOptional);
+                    var selected = currentValuesList.contains(optionValue.getKey());
+
+                    return new Option(encodedKey, truncatedDescription, selected);
+                })
+        .toList());
     }
 
     /**
@@ -1127,7 +1285,7 @@ public final class RenderableFtlFormElementsBuilder {
 
     private String truncate(String value, int maxCharacterLength) {
         if (maxCharacterLength > 8 && value.length() > maxCharacterLength) {
-            return value.substring(0, maxCharacterLength - 8) + "..." + value.substring(value.length() - 5);
+            return StringUtil.truncateEncodedStringToLength(value, maxCharacterLength);
         }
         return value;
     }

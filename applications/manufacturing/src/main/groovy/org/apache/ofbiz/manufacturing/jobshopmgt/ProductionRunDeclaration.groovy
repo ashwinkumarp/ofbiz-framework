@@ -23,7 +23,6 @@ package org.apache.ofbiz.manufacturing.jobshopmgt
 
 import org.apache.ofbiz.entity.util.EntityUtil
 import org.apache.ofbiz.entity.GenericValue
-import org.apache.ofbiz.manufacturing.jobshopmgt.ProductionRun
 
 productionRunId = parameters.productionRunId ?: parameters.workEffortId
 if (productionRunId) {
@@ -211,6 +210,13 @@ if (productionRunId) {
                 } else {
                     componentData.isRunning = 'null'
                 }
+
+                // Fetch reservation metrics
+                Map qtyResult = runService('getTaskQuantities', [workEffortId: component.workEffortId, productId: product.productId])
+                componentData.reservedQuantity = qtyResult.reservedQuantity ?: 0.0
+                componentData.shortfallQuantity = qtyResult.shortfallQuantity ?: 0.0
+                componentData.netReservedQuantity = qtyResult.netReservedQuantity ?: 0.0
+
                 productionRunComponentsData.add(componentData)
                 if (productionRunTask.currentStatusId == 'PRUN_RUNNING' && component.getString('statusId') == 'WEGS_CREATED') {
                     productionRunComponentsDataReadyForIssuance.add(componentData)

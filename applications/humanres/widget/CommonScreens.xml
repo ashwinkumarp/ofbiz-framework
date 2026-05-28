@@ -38,7 +38,6 @@ under the License.
                 <set field="layoutSettings.javaScripts[]" value="/partymgr/static/partymgr.js" global="true"/>
                 <set field="layoutSettings.styleSheets[]" value="/partymgr/static/partymgr.css" global="true"/>
                 <set field="layoutSettings.styleSheets[]" value="/images/humanres/humanres.css" global="true"/>
-                <set field="layoutSettings.javaScripts[+0]" value="/common/js/jquery/ui/js/jquery.cookie-1.4.0.js" global="true"/>
                 <set field="applicationMenuName" value="HumanResAppBar" global="true"/>
                 <set field="applicationMenuLocation" value="${parameters.mainMenuLocation}" global="true"/>
                 <set field="applicationTitle" from-field="uiLabelMap.HumanResManagerApplication" global="true"/>
@@ -78,11 +77,12 @@ under the License.
             <actions>
                 <property-map resource="HumanResUiLabels" map-name="uiLabelMap" global="true"/>
                 <property-map resource="PartyUiLabels" map-name="uiLabelMap" global="true"/>
+                <set field="mainMenuLocation" from-field="parameters.mainMenuLocation" default-value="component://humanres/widget/HumanresMenus.xml"/>
             </actions>
             <widgets>
                 <decorator-screen name="ShortcutDecorator" location="component://common/widget/CommonScreens.xml">
                     <decorator-section name="body">
-                        <include-menu name="HumanResShortcutAppBar" location="${parameters.mainMenuLocation}"/>
+                        <include-menu name="HumanResShortcutAppBar" location="${mainMenuLocation}"/>
                     </decorator-section>
                 </decorator-screen>
             </widgets>

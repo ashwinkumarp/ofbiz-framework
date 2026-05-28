@@ -621,11 +621,11 @@ public final class UtilValidate {
     }
 
     /**
-     * isUrl returns true if the string contains ://
+     * isUrlInString returns true if the string is empty or contains ://
      * @param s String to validate Note: this does not handle "component://" specific to OFBiz
-     * @return true if s contains ://
+     * @return true if s is empty or contains ://
      */
-    public static boolean isUrl(String s) {
+    public static boolean isUrlInString(String s) {
         if (isEmpty(s)) {
             return DEFAULT_EMPTY_OK;
         }
@@ -633,11 +633,11 @@ public final class UtilValidate {
     }
 
     /**
-     * urlInString returns true if the string contains :// and does not start with "component://"
+     * isUrlInStringAndDoesNotStartByComponentProtocol returns true if the string is non-empty, contains :// but does not start with "component://"
      * @param s String to validate
-     * @return true if s contains :// and does not start with "component://"
+     * @return true if s is non-empty, contains :// and does not start with "component://"
      */
-    public static boolean urlInString(String s) {
+    public static boolean isUrlInStringAndDoesNotStartByComponentProtocol(String s) {
         if (isEmpty(s) || s.startsWith("component://")) {
             return false;
         }
@@ -920,18 +920,6 @@ public final class UtilValidate {
         return isTime(hour, minute, second);
     }
 
-    /** Check to see if a card number is a valid ValueLink Gift Card
-     * @param stPassed a string representing a valuelink gift card
-     * @return true, if the number passed simple checks
-     */
-    public static boolean isValueLinkCard(String stPassed) {
-        if (isEmpty(stPassed)) {
-            return DEFAULT_EMPTY_OK;
-        }
-        String st = stripCharsInBag(stPassed, CREDIT_CARD_DELIMITERS);
-        return st.length() == 16 && (st.startsWith("7") || st.startsWith("6"));
-    }
-
     /** Check to see if a card number is a valid OFB Gift Card (Certifiicate)
      * @param stPassed a string representing a gift card
      * @return tru, if the number passed simple checks
@@ -949,7 +937,7 @@ public final class UtilValidate {
      * @return true, if the number passed simple checks
      */
     public static boolean isGiftCard(String stPassed) {
-        return isOFBGiftCard(stPassed) || isValueLinkCard(stPassed);
+        return isOFBGiftCard(stPassed);
     }
 
     public static int getLuhnSum(String stPassed) {

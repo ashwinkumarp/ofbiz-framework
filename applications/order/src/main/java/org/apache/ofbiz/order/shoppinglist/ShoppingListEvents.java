@@ -27,10 +27,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import org.apache.ofbiz.base.util.Debug;
 import org.apache.ofbiz.base.util.GeneralException;
@@ -535,7 +535,7 @@ public class ShoppingListEvents {
 
         // check to see if we are okay to load this list
         java.sql.Timestamp lastLoad = cart.getLastListRestore();
-        boolean okayToLoad = autoSaveListId == null ? false : (lastLoad == null ? true : false);
+        boolean okayToLoad = autoSaveListId != null && lastLoad == null;
         if (!okayToLoad && lastLoad != null) {
             GenericValue shoppingList = null;
             try {
@@ -766,6 +766,7 @@ public class ShoppingListEvents {
         Cookie guestShoppingListCookie = new Cookie(guestShoppingUserName, null);
         guestShoppingListCookie.setMaxAge(0);
         guestShoppingListCookie.setPath("/");
+        guestShoppingListCookie.setSecure(true);
         response.addCookie(guestShoppingListCookie);
         return "success";
     }

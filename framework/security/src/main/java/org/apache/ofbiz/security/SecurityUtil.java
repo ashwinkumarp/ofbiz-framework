@@ -19,23 +19,18 @@
 package org.apache.ofbiz.security;
 
 
+import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.http.message.BasicNameValuePair;
 import org.apache.ofbiz.base.util.Debug;
-import org.apache.ofbiz.base.util.StringUtil;
-import org.apache.ofbiz.base.util.UtilHttp;
-import org.apache.ofbiz.base.util.UtilMisc;
+import org.apache.ofbiz.base.util.GeneralException;
 import org.apache.ofbiz.base.util.UtilProperties;
+import org.apache.ofbiz.base.util.StringUtil;
+import org.apache.ofbiz.base.util.UtilMisc;
 import org.apache.ofbiz.base.util.UtilValidate;
 import org.apache.ofbiz.entity.Delegator;
 import org.apache.ofbiz.entity.GenericEntityException;
@@ -145,6 +140,79 @@ public final class SecurityUtil {
     }
 
     /**
+     * Checks that the given file is within one of the directories listed in
+     * {@code content.data.local.file.allowed.paths} (security.properties).
+     * Use {@code ${ofbiz.home}} as a portable placeholder for the OFBiz home directory.
+     */
+    public static void checkLocalFileAllowList(File file) throws GeneralException {
+        try {
+            String canonicalFilePath = file.getCanonicalPath();
+            String ofbizHome = System.getProperty("ofbiz.home");
+            String allowedPathsStr = UtilProperties.getPropertyValue("security",
+                    "content.data.local.file.allowed.paths", "${ofbiz.home}");
+            if (UtilValidate.isNotEmpty(allowedPathsStr)) {
+                boolean inAllowedPath = false;
+                for (String allowedPath : allowedPathsStr.split(",")) {
+                    allowedPath = allowedPath.trim().replace("${ofbiz.home}", ofbizHome);
+                    if (UtilValidate.isEmpty(allowedPath)) {
+                        continue;
+                    }
+                    String canonicalAllowedDir = new File(allowedPath).getCanonicalPath();
+                    if (canonicalFilePath.startsWith(canonicalAllowedDir + File.separator)
+                            || canonicalFilePath.equals(canonicalAllowedDir)) {
+                        inAllowedPath = true;
+                        break;
+                    }
+                }
+                if (!inAllowedPath) {
+                    throw new GeneralException("Access to file denied: path is not within an allowed directory");
+                }
+            }
+        } catch (IOException e) {
+            throw new GeneralException("Unable to validate file path: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Checks that the given file is within one of the subdirectories listed in
+     * {@code content.data.ofbiz.file.allowed.paths} (security.properties), relative to the OFBiz
+     * home directory. The check uses canonical paths (resolving symlinks on both sides), so
+     * EFS/Docker volume mounts on allowed subdirectories are handled correctly. A preliminary
+     * "must be under ofbiz.home" canonical check is intentionally absent: when an allowed
+     * subdirectory (e.g. {@code runtime/}) is a mount point, the file's canonical path diverges
+     * from {@code canonicalHome}, but the per-allowed-path comparison below still passes because
+     * it resolves both sides through the mount. Path traversal via {@code ../} is still blocked.
+     */
+    public static void checkOfbizFileAllowList(File file) throws GeneralException {
+        try {
+            String canonicalHome = new File(System.getProperty("ofbiz.home")).getCanonicalPath();
+            String canonicalFilePath = file.getCanonicalPath();
+            String allowedPathsStr = UtilProperties.getPropertyValue("security",
+                    "content.data.ofbiz.file.allowed.paths", "applications/,themes/,plugins/,runtime/");
+            if (UtilValidate.isNotEmpty(allowedPathsStr)) {
+                boolean inAllowedPath = false;
+                for (String relPath : allowedPathsStr.split(",")) {
+                    relPath = relPath.trim().replaceAll("^/+", "");
+                    if (UtilValidate.isEmpty(relPath)) {
+                        continue;
+                    }
+                    String canonicalAllowedDir = new File(canonicalHome, relPath).getCanonicalPath();
+                    if (canonicalFilePath.startsWith(canonicalAllowedDir + File.separator)
+                            || canonicalFilePath.equals(canonicalAllowedDir)) {
+                        inAllowedPath = true;
+                        break;
+                    }
+                }
+                if (!inAllowedPath) {
+                    throw new GeneralException("Access to file denied: path is not within an allowed directory");
+                }
+            }
+        } catch (IOException e) {
+            throw new GeneralException("Unable to validate file path: " + e.getMessage());
+        }
+    }
+
+    /**
      * Return a JWToken for authenticate a userLogin with salt the token by userLoginId and currentPassword
      */
     public static String generateJwtToAuthenticateUserLogin(Delegator delegator, String userLoginId)
@@ -162,9 +230,11 @@ public final class SecurityUtil {
         if (UtilValidate.isNotEmpty(jwtToken)) {
             try {
                 GenericValue userLogin = EntityQuery.use(delegator).from("UserLogin").where("userLoginId", userLoginId).queryOne();
-                Map<String, Object> claims = JWTManager.validateToken(delegator, jwtToken,
-                        userLogin.getString("userLoginId") + userLogin.getString("currentPassword"));
-                return (!ServiceUtil.isError(claims)) && userLoginId.equals(claims.get("userLoginId"));
+                if (userLoginId != null) {
+                    Map<String, Object> claims = JWTManager.validateToken(delegator, jwtToken,
+                            userLogin.getString("userLoginId") + userLogin.getString("currentPassword"));
+                    return (!ServiceUtil.isError(claims)) && userLoginId.equals(claims.get("userLoginId"));
+                }
             } catch (GenericEntityException e) {
                 Debug.logWarning("failed to validate a jwToken for user " + userLoginId, MODULE);
             }
@@ -172,67 +242,4 @@ public final class SecurityUtil {
         return false;
     }
 
-    /*
-     * Prevents Freemarker exploits
-     * @param req
-     * @param resp
-     * @param uri
-     * @throws IOException
-     */
-    public static boolean containsFreemarkerInterpolation(HttpServletRequest req, HttpServletResponse resp, String uri)
-            throws IOException {
-        String urisOkForFreemarker = UtilProperties.getPropertyValue("security", "allowedURIsForFreemarkerInterpolation");
-        List<String> urisOK = UtilValidate.isNotEmpty(urisOkForFreemarker) ? StringUtil.split(urisOkForFreemarker, ",")
-                                                                           : new ArrayList<>();
-        String uriEnd = uri.substring(uri.lastIndexOf("/") + 1, uri.length());
-
-        if (!urisOK.contains(uriEnd)) {
-            Map<String, String[]> parameterMap = req.getParameterMap();
-            if (uri.contains("ecomseo")) { // SeoContextFilter call
-                if (containsFreemarkerInterpolation(resp, uri)) {
-                    return true;
-                }
-            } else if (!parameterMap.isEmpty()) { // ControlFilter call
-                List<BasicNameValuePair> params = new ArrayList<>();
-                parameterMap.forEach((name, values) -> {
-                    for (String value : values) {
-                        params.add(new BasicNameValuePair(name, value));
-                    }
-                });
-                String queryString = URLEncodedUtils.format(params, Charset.forName("UTF-8"));
-                uri = uri + "?" + queryString;
-                if (SecurityUtil.containsFreemarkerInterpolation(resp, uri)) {
-                    return true;
-                }
-            } else if (!UtilHttp.getAttributeMap(req).isEmpty()) { // Call with Content-Type modified by a MITM attack (rare case)
-                String attributeMap = UtilHttp.getAttributeMap(req).toString();
-                if (containsFreemarkerInterpolation(resp, attributeMap)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * @param resp
-     * @param stringToCheck
-     * @throws IOException
-     */
-    public static boolean containsFreemarkerInterpolation(HttpServletResponse resp, String stringToCheck) throws IOException {
-        if (stringToCheck.contains("%24%7B") || stringToCheck.contains("${")
-                || stringToCheck.contains("%3C%23") || stringToCheck.contains("<#")
-                || stringToCheck.contains("%23%7B") || stringToCheck.contains("#{")
-                || stringToCheck.contains("%5B%3D") || stringToCheck.contains("[=")
-                || stringToCheck.contains("%5B%23") || stringToCheck.contains("[#")) { // not used OOTB in OFBiz, but possible
-
-            Debug.logError("===== Not saved for security reason, strings '${', '<#', '#{', '[=' or '[#' not accepted in fields! =====",
-                    MODULE);
-            resp.sendError(HttpServletResponse.SC_FORBIDDEN,
-                    "Not saved for security reason, strings '${', '<#', '#{', '[=' or '[#' not accepted in fields!");
-            return true;
-        } else {
-            return false;
-        }
-    }
 }

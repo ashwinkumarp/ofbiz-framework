@@ -31,8 +31,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import javax.transaction.Transaction;
 
 import org.apache.commons.lang.StringUtils;
@@ -94,10 +94,9 @@ public class PayPalServices {
 
     public static Map<String, Object> setExpressCheckout(DispatchContext dctx, Map<String, ? extends Object> context) {
         ShoppingCart cart = (ShoppingCart) context.get("cart");
-        Locale locale = cart.getLocale();
-        if (cart == null || cart.items().size() <= 0) {
-            return ServiceUtil.returnError(UtilProperties.getMessage(RESOURCE,
-                    "AccountingPayPalShoppingCartIsEmpty", locale));
+        if (cart == null || cart.isEmpty()) {
+              return ServiceUtil.returnError(UtilProperties.getMessage(RESOURCE,
+                           "AccountingPayPalShoppingCartIsEmpty", (cart == null || cart.getLocale() == null) ? Locale.US : cart.getLocale()));
         }
 
         GenericValue payPalConfig = getPaymentMethodGatewayPayPal(dctx, context, null);
@@ -484,7 +483,7 @@ public class PayPalServices {
                 return ServiceUtil.returnError(e.getMessage());
             }
         }
-        cart.addContactMech("ORDER_EMAIL", emailContactMechId);
+        cart.addContactMechId("ORDER_EMAIL", emailContactMechId);
 
         // Phone number
         String phoneNumber = decoder.get("PHONENUM");
@@ -508,7 +507,7 @@ public class PayPalServices {
             try {
                 outMap = dispatcher.runSync("createUpdatePartyTelecomNumber", inMap);
                 phoneContactId = (String) outMap.get("contactMechId");
-                cart.addContactMech("PHONE_BILLING", phoneContactId);
+                cart.addContactMechId("PHONE_BILLING", phoneContactId);
             } catch (GenericServiceException e) {
                 Debug.logError(e, MODULE);
             }
@@ -517,7 +516,7 @@ public class PayPalServices {
         String postalContactId = null;
         boolean needsShippingPurpose = true;
         // if the cart for some reason already has a billing address, we'll leave it be
-        boolean needsBillingPurpose = (cart.getContactMech("BILLING_LOCATION") == null);
+        boolean needsBillingPurpose = (cart.getContactMechId("BILLING_LOCATION") == null);
         Map<String, Object> postalMap = new HashMap<>();
         postalMap.put("toName", decoder.get("SHIPTONAME"));
         postalMap.put("address1", decoder.get("SHIPTOSTREET"));

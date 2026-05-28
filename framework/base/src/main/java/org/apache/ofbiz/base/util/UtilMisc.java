@@ -617,6 +617,21 @@ public final class UtilMisc {
     }
 
     /**
+     * List of allowed origins for the API CORS policy, read from the
+     * {@code cors.origins.allowed} property in security.properties.
+     * Each entry must be a full origin (scheme + host + optional port),
+     * e.g. {@code https://app.example.com}.
+     * @return unmodifiable list of allowed CORS origins, or null if the property is empty
+     */
+    public static List<String> getCorsOriginsAllowed() {
+        String corsOriginsAllowedString = UtilProperties.getPropertyValue("security", "cors.origins.allowed");
+        if (UtilValidate.isEmpty(corsOriginsAllowedString)) {
+            return null;
+        }
+        return Collections.unmodifiableList(StringUtil.split(corsOriginsAllowedString, ","));
+    }
+
+    /**
      * @deprecated use Thread.sleep()
      */
     @Deprecated
@@ -674,7 +689,7 @@ public final class UtilMisc {
     }
 
     // Private lazy-initializer class
-    private static class LocaleHolder {
+    private static final class LocaleHolder {
         private static final List<Locale> AVAIL_LOCALE_LIST = getAvailableLocaleList();
 
         private static List<Locale> getAvailableLocaleList() {

@@ -25,7 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.ofbiz.base.util.GeneralException;
 import org.apache.ofbiz.base.util.StringUtil;
@@ -36,7 +36,7 @@ import org.apache.ofbiz.content.content.ContentWorker;
 import org.apache.ofbiz.content.content.PermissionRecorder;
 import org.apache.ofbiz.entity.Delegator;
 import org.apache.ofbiz.entity.GenericValue;
-import org.apache.ofbiz.entityext.permission.EntityPermissionChecker;
+import org.apache.ofbiz.content.permission.EntityPermissionChecker;
 import org.apache.ofbiz.security.Security;
 import org.apache.ofbiz.service.ModelService;
 import org.apache.ofbiz.webapp.ftl.LoopWriter;

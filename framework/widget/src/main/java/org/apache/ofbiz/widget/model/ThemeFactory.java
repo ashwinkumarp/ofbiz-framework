@@ -25,9 +25,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import javax.xml.parsers.ParserConfigurationException;
 import org.apache.ofbiz.base.location.FlexibleLocation;
 import org.apache.ofbiz.base.util.Debug;
@@ -180,7 +180,7 @@ public final class ThemeFactory {
                     if (modelTheme == null) {
                         URL themeFileUrl = null;
                         themeFileUrl = FlexibleLocation.resolveLocation(resourceName);
-                        if (themeFileUrl == null) {
+                        if (themeFileUrl == null || UtilValidate.isUrlInStringAndDoesNotStartByComponentProtocol(themeFileUrl.toString())) {
                             throw new IllegalArgumentException("Could not resolve location to URL: " + resourceName);
                         }
                         Document themeFileDoc = UtilXml.readXmlDocument(themeFileUrl, true, true);
@@ -236,7 +236,9 @@ public final class ThemeFactory {
         String visualThemeId = null;
         if (request != null) {
             HttpSession session = request.getSession();
-            GenericValue userLogin = (GenericValue) session.getAttribute("userLogin");
+            GenericValue userLogin = session != null
+                    ? (GenericValue) session.getAttribute("userLogin")
+                    : null;
             //search on request only if a userLogin is present on session (otherwise this implied that the user isn't identify so wait
             if (userLogin != null) {
                 VisualTheme visualTheme = (VisualTheme) session.getAttribute("visualTheme");
@@ -258,7 +260,7 @@ public final class ThemeFactory {
             }
 
             //resolve from webapp
-            if (visualThemeId == null) {
+            if (visualThemeId == null && session != null) {
                 ServletContext servletContext = request.getServletContext();
                 visualThemeId = servletContext.getInitParameter("visualThemeId");
             }

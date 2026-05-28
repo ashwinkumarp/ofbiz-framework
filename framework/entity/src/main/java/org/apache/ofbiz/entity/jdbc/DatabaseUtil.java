@@ -1091,7 +1091,9 @@ public class DatabaseUtil {
             if (messages != null) messages.add(message);
         } finally {
             try {
-                tableSet.close();
+                if (tableSet != null) {
+                    tableSet.close();
+                }
             } catch (SQLException e) {
                 String message = "Unable to close ResultSet for table list, continuing anyway... Error was:" + e.toString();
                 Debug.logError(message, MODULE);
@@ -1226,19 +1228,11 @@ public class DatabaseUtil {
 
                     // first try getting all at once for databases that support that and can generally perform WAY better, if that fails get one at
                     // a time so it will at least work
-                    try (ResultSet rsPks = dbData.getPrimaryKeys(null, lookupSchemaName, null)) {
+                    try (ResultSet rsPks = dbData.getPrimaryKeys(null, lookupSchemaName, "%")) {
                         pkCount += checkPrimaryKeyInfo(rsPks, lookupSchemaName, needsUpperCase, colInfo, messages);
                     } catch (Exception e1) {
-                        Debug.logInfo("Error getting primary key info from database with null tableName, will try other means: " + e1.toString(),
+                        Debug.logInfo("Error getting primary key info from database with % tableName, will try other means: " + e1.toString(),
                                       MODULE);
-                    }
-                    if (pkCount == 0) {
-                        try (ResultSet rsPks = dbData.getPrimaryKeys(null, lookupSchemaName, "%")) {
-                            pkCount += checkPrimaryKeyInfo(rsPks, lookupSchemaName, needsUpperCase, colInfo, messages);
-                        } catch (Exception e1) {
-                            Debug.logInfo("Error getting primary key info from database with % tableName, will try other means: " + e1.toString(),
-                                          MODULE);
-                        }
                     }
                     if (pkCount == 0) {
                         Debug.logInfo("Searching in " + tableNames.size() + " tables for primary key fields ...", MODULE);

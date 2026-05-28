@@ -18,6 +18,8 @@
  *******************************************************************************/
 package org.apache.ofbiz.webapp.control;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import static org.apache.ofbiz.base.util.UtilGenerics.checkMap;
 
 import java.math.BigInteger;
@@ -36,13 +38,13 @@ import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import javax.servlet.jsp.PageContext;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.jsp.PageContext;
 import javax.transaction.Transaction;
 
 import org.apache.http.HttpStatus;
@@ -80,6 +82,7 @@ import org.apache.ofbiz.entity.util.EntityUtilProperties;
 import org.apache.ofbiz.security.Security;
 import org.apache.ofbiz.security.SecurityConfigurationException;
 import org.apache.ofbiz.security.SecurityFactory;
+import org.apache.ofbiz.security.SecurityUtil;
 import org.apache.ofbiz.service.GenericServiceException;
 import org.apache.ofbiz.service.LocalDispatcher;
 import org.apache.ofbiz.service.ModelService;
@@ -87,6 +90,7 @@ import org.apache.ofbiz.service.ServiceUtil;
 import org.apache.ofbiz.webapp.WebAppCache;
 import org.apache.ofbiz.webapp.WebAppUtil;
 import org.apache.ofbiz.webapp.stats.VisitHandler;
+import org.apache.ofbiz.webapp.website.WebSiteProperties;
 import org.apache.ofbiz.widget.model.ThemeFactory;
 
 /**
@@ -440,10 +444,9 @@ public final class LoginWorker {
         if (UtilValidate.isEmpty(password) && UtilValidate.isEmpty(token)) {
             unpwErrMsgList.add(UtilProperties.getMessage(RESOURCE, "loginevents.password_was_empty_reenter", UtilHttp.getLocale(request)));
         }
-        boolean requirePasswordChange = "Y".equals(request.getParameter("requirePasswordChange"));
         if (!unpwErrMsgList.isEmpty()) {
             request.setAttribute("_ERROR_MESSAGE_LIST_", unpwErrMsgList);
-            return requirePasswordChange ? "requirePasswordChange" : "error";
+            return "error";
         }
 
         boolean setupNewDelegatorEtc = false;
@@ -531,8 +534,9 @@ public final class LoginWorker {
 
         if (ModelService.RESPOND_SUCCESS.equals(result.get(ModelService.RESPONSE_MESSAGE))) {
             GenericValue userLogin = (GenericValue) result.get("userLogin");
-
-            if (requirePasswordChange) {
+            if (userLogin != null && "Y".equals(userLogin.getString("requirePasswordChange"))
+                    && UtilValidate.isNotEmpty(request.getParameter("newPassword"))
+                    && UtilValidate.isNotEmpty(request.getParameter("newPasswordVerify"))) {
                 Map<String, Object> inMap = UtilMisc.<String, Object>toMap(
                         "login.username", username,
                         "login.password", password,
@@ -550,7 +554,7 @@ public final class LoginWorker {
                     String errMsg = UtilProperties.getMessage(RESOURCE, "loginevents.following_error_occurred_during_login",
                             messageMap, UtilHttp.getLocale(request));
                     request.setAttribute("_ERROR_MESSAGE_", errMsg);
-                    return "requirePasswordChange";
+                    return "error";
                 }
                 if (ServiceUtil.isError(resultPasswordChange)) {
                     String errorMessage = (String) resultPasswordChange.get(ModelService.ERROR_MESSAGE);
@@ -561,7 +565,7 @@ public final class LoginWorker {
                         request.setAttribute("_ERROR_MESSAGE_", errMsg);
                     }
                     request.setAttribute("_ERROR_MESSAGE_LIST_", resultPasswordChange.get(ModelService.ERROR_MESSAGE_LIST));
-                    return "requirePasswordChange";
+                    return "error";
                 } else {
                     try {
                         userLogin.refresh();
@@ -571,7 +575,7 @@ public final class LoginWorker {
                         String errMsg = UtilProperties.getMessage(RESOURCE, "loginevents.following_error_occurred_during_login",
                                 messageMap, UtilHttp.getLocale(request));
                         request.setAttribute("_ERROR_MESSAGE_", errMsg);
-                        return "requirePasswordChange";
+                        return "error";
                     }
                 }
             }
@@ -593,12 +597,10 @@ public final class LoginWorker {
             }
 
             // check on JavaScriptEnabled
-            String javaScriptEnabled = "N";
-            if ("Y".equals(request.getParameter("JavaScriptEnabled"))) {
-                javaScriptEnabled = "Y";
-            }
+            String javaScriptEnabled = "N".equals(request.getParameter("JavaScriptEnabled"))
+                    ? "N" : "Y";
             try {
-                result = dispatcher.runSync("setUserPreference", UtilMisc.toMap("userPrefTypeId", "javaScriptEnabled", "userPrefGroupTypeId",
+                dispatcher.runSync("setUserPreference", UtilMisc.toMap("userPrefTypeId", "javaScriptEnabled", "userPrefGroupTypeId",
                         "GLOBAL_PREFERENCES", "userPrefValue", javaScriptEnabled, "userLogin", userLogin));
             } catch (GenericServiceException e) {
                 Debug.logError(e, "Error setting user preference", MODULE);
@@ -697,10 +699,8 @@ public final class LoginWorker {
             Map<String, Object> userLoginSession = checkMap(result.get("userLoginSession"), String.class, Object.class);
 
             // check on JavaScriptEnabled
-            String javaScriptEnabled = "N";
-            if ("Y".equals(request.getParameter("JavaScriptEnabled"))) {
-                javaScriptEnabled = "Y";
-            }
+            String javaScriptEnabled = "N".equals(request.getParameter("JavaScriptEnabled"))
+                    ? "N" : "Y";
             try {
                 dispatcher.runSync("setUserPreference", UtilMisc.toMap("userPrefTypeId", "javaScriptEnabled",
                         "userPrefGroupTypeId", "GLOBAL_PREFERENCES", "userPrefValue", javaScriptEnabled, "userLogin", userLogin));
@@ -825,6 +825,9 @@ public final class LoginWorker {
         // Create a secured cookie with the correct userLoginId
         createSecuredLoginIdCookie(request, response);
 
+        // Create a secured cookie with a jwt contains the userLoginId
+        createSecuredLoginJwtCookie(request, response);
+
         // make sure the autoUserLogin is set to the same and that the client cookie has the correct userLoginId
         autoLoginSet(request, response);
 
@@ -844,7 +847,7 @@ public final class LoginWorker {
         } catch (GenericServiceException e) {
             Debug.logError(e, "Error getting user preference", MODULE);
         }
-        session.setAttribute("javaScriptEnabled", "Y".equals(javaScriptEnabled));
+        session.setAttribute("javaScriptEnabled", !"N".equals(javaScriptEnabled));
 
         //init theme from user preference, clean the current visualTheme value in session and restart the resolution
         UtilHttp.setVisualTheme(session, null);
@@ -1000,6 +1003,38 @@ public final class LoginWorker {
         }
     }
 
+    /**
+     * Set to response a cookie that contains an identification jwt to share with some other webapp who authenticate with
+     * event securedUserLoginByJWTCookie
+     * @param request
+     * @param response
+     */
+    public static void createSecuredLoginJwtCookie(HttpServletRequest request, HttpServletResponse response) {
+        Delegator delegator = (Delegator) request.getAttribute("delegator");
+        HttpSession session = request.getSession();
+        GenericValue userLogin = (GenericValue) session.getAttribute("userLogin");
+        if (userLogin != null) {
+            try {
+                String cookieName = "securedLoginToken";
+                Cookie securedLoginTokenCookie = new Cookie(cookieName,
+                        SecurityUtil.generateJwtToAuthenticateUserLogin(
+                                delegator, userLogin.getString("userLoginId")));
+                String cookieDomain = "";
+                try {
+                    WebSiteProperties webSiteProperties = WebSiteProperties.from(request);
+                    cookieDomain = webSiteProperties != null
+                            ? webSiteProperties.getHttpsHost()
+                            : EntityUtilProperties.getPropertyValue("url", "cookie.domain", delegator);
+                } catch (GenericEntityException ignored) { }
+                securedLoginTokenCookie.setDomain(cookieDomain);
+                securedLoginTokenCookie.setPath("/");
+                securedLoginTokenCookie.setSecure(true);
+                securedLoginTokenCookie.setHttpOnly(true);
+                response.addCookie(securedLoginTokenCookie);
+            } catch (Exception ignored) { }
+        }
+    }
+
     protected static String getAutoLoginCookieName(HttpServletRequest request) {
         return UtilHttp.getApplicationName(request) + ".autoUserLoginId";
     }
@@ -1038,7 +1073,39 @@ public final class LoginWorker {
                 }
             }
         }
+
+        // Verify the plain-text cookie against the mathematically secure JWT token
+        if (UtilValidate.isNotEmpty(securedUserLoginId)) {
+            String jwtUserLoginId = getSecuredUserLoginByJWT(request);
+            if (UtilValidate.isEmpty(jwtUserLoginId) || !securedUserLoginId.equals(jwtUserLoginId)) {
+                Debug.logWarning("Cookie securedLoginId [" + securedUserLoginId
+                        + "] does not match or is missing a valid securedLoginToken JWT.", MODULE);
+                return null;
+            }
+        }
+
         return securedUserLoginId;
+    }
+    public static String getSecuredUserLoginByJWT(HttpServletRequest request) {
+        Delegator delegator = (Delegator) request.getAttribute("delegator");
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            Optional<Cookie> securedCookie = Arrays.stream(cookies)
+                    .filter(cookie -> cookie.getName().equals("securedLoginToken"))
+                    .findFirst();
+            if (securedCookie.isPresent()) {
+                try {
+                    DecodedJWT jwt = JWT.decode(securedCookie.get().getValue());
+                    if (SecurityUtil.authenticateUserLoginByJWT(delegator,
+                            jwt.getClaim("userLoginId").asString(), jwt.getToken())) {
+                        return jwt.getClaim("userLoginId").asString();
+                    }
+                } catch (Exception failed) {
+                    Debug.logWarning(failed, MODULE);
+                }
+            }
+        }
+        return null;
     }
 
     public static String autoLoginCheck(HttpServletRequest request, HttpServletResponse response) {
@@ -1051,6 +1118,14 @@ public final class LoginWorker {
         return autoLoginCheck(delegator, session, getAutoUserLoginId(request));
     }
 
+    public static String securedUserLoginByJWTCookie(HttpServletRequest request, HttpServletResponse response) {
+        String userLoginId = getSecuredUserLoginByJWT(request);
+        if (userLoginId != null) {
+            return loginUserWithUserLoginId(request, response, userLoginId);
+        }
+        return "success";
+    }
+
     private static String autoLoginCheck(Delegator delegator, HttpSession session, String autoUserLoginId) {
         if (autoUserLoginId != null) {
             if (Debug.infoOn()) {
@@ -1058,21 +1133,9 @@ public final class LoginWorker {
             }
             try {
                 GenericValue autoUserLogin = EntityQuery.use(delegator).from("UserLogin").where("userLoginId", autoUserLoginId).queryOne();
-                GenericValue person = null;
-                GenericValue group = null;
                 if (autoUserLogin != null) {
                     session.setAttribute("autoUserLogin", autoUserLogin);
-
-                    ModelEntity modelUserLogin = autoUserLogin.getModelEntity();
-                    if (modelUserLogin.isField("partyId")) {
-                        person = EntityQuery.use(delegator).from("Person").where("partyId", autoUserLogin.getString("partyId")).queryOne();
-                        group = EntityQuery.use(delegator).from("PartyGroup").where("partyId", autoUserLogin.getString("partyId")).queryOne();
-                    }
-                }
-                if (person != null) {
-                    session.setAttribute("autoName", person.getString("firstName") + " " + person.getString("lastName"));
-                } else if (group != null) {
-                    session.setAttribute("autoName", group.getString("groupName"));
+                    session.setAttribute("autoName", autoUserLogin.getString("userFullName"));
                 }
             } catch (GenericEntityException e) {
                 Debug.logError(e, "Cannot get autoUserLogin information: " + e.getMessage(), MODULE);
@@ -1093,6 +1156,7 @@ public final class LoginWorker {
             autoLoginCookie.setMaxAge(0);
             autoLoginCookie.setDomain(EntityUtilProperties.getPropertyValue("url", "cookie.domain", delegator));
             autoLoginCookie.setPath("root".equals(applicationName) ? "/" : request.getContextPath());
+            autoLoginCookie.setSecure(true);
             response.addCookie(autoLoginCookie);
         }
         // remove the session attributes
@@ -1228,7 +1292,7 @@ public final class LoginWorker {
             //Debug.logInfo("CN Pattern: " + cnPattern, MODULE);
 
             if (currentUserLogin == null) {
-                X509Certificate[] clientCerts = (X509Certificate[]) request.getAttribute("javax.servlet.request.X509Certificate"); // 2.2 spec
+                X509Certificate[] clientCerts = (X509Certificate[]) request.getAttribute("jakarta.servlet.request.X509Certificate"); // 2.2 spec
                 if (clientCerts == null) {
                     clientCerts = (X509Certificate[]) request.getAttribute("javax.net.ssl.peer_certificates"); // 2.1 spec
                 }

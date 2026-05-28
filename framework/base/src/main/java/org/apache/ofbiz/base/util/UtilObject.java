@@ -57,19 +57,18 @@ public final class UtilObject {
      * that the returned value is length of the byte stream after the object has
      * been serialized. The returned value does not represent the amount of memory
      * the object uses. There is no accurate way to determine the size of an
-     * object in memory.</p>
+     * object in memory.
+     *
      * @param obj
      * @return the number of bytes in the serialized object
      * @throws IOException
      */
     public static long getByteCount(Object obj) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutputStream oos = new ObjectOutputStream(bos);
-        oos.writeObject(obj);
-        oos.flush();
-        long size = bos.size();
-        bos.close();
-        return size;
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream(); ObjectOutputStream oos = new ObjectOutputStream(bos)) {
+            oos.writeObject(obj);
+            oos.flush();
+            return bos.size();
+        }
     }
 
     /** Deserialize a byte array back to an object; if there is an error, it is logged, and null is returned. */
@@ -121,6 +120,6 @@ public final class UtilObject {
                 return instance;
             }
         }
-        throw new ClassNotFoundException(factoryInterface.getClass().getName());
+        throw new ClassNotFoundException(factoryInterface.getName());
     }
 }

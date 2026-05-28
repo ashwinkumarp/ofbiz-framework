@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<script type="application/javascript">
+<script type="text/javascript">
     function editInstruction(shipGroupSeqId) {
         jQuery('#shippingInstructions_' + shipGroupSeqId).css({display:'block'});
         jQuery('#saveInstruction_' + shipGroupSeqId).css({display:'inline'});
@@ -426,7 +426,7 @@ under the License.
                       <td>
                           <input type="submit" value="${uiLabelMap.CommonUpdate}" class="smallSubmit"/>
                           <a class="buttontext" id="newShippingAddress" href="javascript:void(0);">${uiLabelMap.OrderNewShippingAddress}</a>
-                          <script type="application/javascript">
+                          <script type="text/javascript">
                               jQuery("#newShippingAddress").click(function(){jQuery("#newShippingAddressForm").dialog("open")});
                           </script>
                       </td>
@@ -494,7 +494,7 @@ under the License.
             </div>
           </form>
         </div>
-        <script type="application/javascript">
+        <script type="text/javascript">
          jQuery(document).ready( function() {
           jQuery("#newShippingAddressForm").dialog({autoOpen: false, modal: true,
                   buttons: {
@@ -801,7 +801,8 @@ under the License.
                  </#if>
                <#else>
                  <#assign facilities = facilitiesForShipGroup.get(shipGroup.shipGroupSeqId)>
-                 <#if facilities?has_content>
+                 <#if "ORDER_APPROVED" == orderHeader.statusId>
+                   <#if facilities?has_content>
                      <div>
                       <form name="createShipment2_${shipGroup.shipGroupSeqId}" method="post" action="/facility/control/createShipment">
                          <input type="hidden" name="primaryOrderId" value="${orderId}"/>
@@ -819,7 +820,7 @@ under the License.
                          <input type="submit" class="smallSubmit" value="${uiLabelMap.OrderNewShipmentForShipGroup} [${shipGroup.shipGroupSeqId}]"/>
                       </form>
                       </div>
-                 <#else>
+                   <#else>
                      <a href="javascript:document.quickDropShipOrder_${shipGroup_index}.submit();" class="buttontext">${uiLabelMap.ProductShipmentQuickComplete}</a>
                      <a href="javascript:document.createShipment3_${shipGroup.shipGroupSeqId}.submit();" class="buttontext">${uiLabelMap.OrderNewDropShipmentForShipGroup} [${shipGroup.shipGroupSeqId}]</a>
                      <form name="quickDropShipOrder_${shipGroup_index}" method="post" action="<@ofbizUrl>quickDropShipOrder</@ofbizUrl>">
@@ -834,6 +835,7 @@ under the License.
                           <input type="hidden" name="statusId" value="PURCH_SHIP_CREATED" />
                           <input type="hidden" name="externalLoginKey" value="${externalLoginKey}" />
                       </form>
+                   </#if>
                  </#if>
                </#if>
               </td>

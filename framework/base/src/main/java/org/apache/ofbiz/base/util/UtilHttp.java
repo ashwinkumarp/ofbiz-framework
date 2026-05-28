@@ -65,14 +65,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.net.ssl.SSLContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileUploadException;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.fileupload2.core.DiskFileItem;
+import org.apache.commons.fileupload2.core.DiskFileItemFactory;
+import org.apache.commons.fileupload2.core.FileItem;
+import org.apache.commons.fileupload2.core.FileUploadException;
+import org.apache.commons.fileupload2.jakarta.JakartaServletFileUpload;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -91,6 +89,10 @@ import org.apache.ofbiz.widget.renderer.VisualTheme;
 
 import com.google.re2j.Matcher;
 import com.google.re2j.Pattern;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 /**
  * HttpUtil - Misc HTTP Utility Functions
@@ -163,7 +165,12 @@ public final class UtilHttp {
         params.putAll(getPathInfoOnlyParameterMap(req.getPathInfo(), pred));
 
         // If nothing is found in the parameters, try to find something in the multi-part map.
-        Map<String, Object> multiPartMap = params.isEmpty() ? getMultiPartParameterMap(req) : Collections.emptyMap();
+        Map<String, Object> multiPartMap = null;
+        try {
+            multiPartMap = params.isEmpty() ? getMultiPartParameterMap(req) : Collections.emptyMap();
+        } catch (FileUploadException e) {
+            throw new RuntimeException(e);
+        }
         params.putAll(multiPartMap);
         if (req.getAttribute("multiPartMap") == null) {
             req.setAttribute("multiPartMap", multiPartMap);
@@ -176,7 +183,8 @@ public final class UtilHttp {
         String requestURI = req.getRequestURI();
         if (params.isEmpty() && null != requestURI) {
             try {
-                List<NameValuePair> nameValuePairs = URLEncodedUtils.parse(new URI(URLDecoder.decode(requestURI, "UTF-8")),
+                List<NameValuePair> nameValuePairs = URLEncodedUtils.parse(
+                        new URI(UtilHttp.encodeBlanks(URLDecoder.decode(requestURI, "UTF-8"))),
                         Charset.forName("UTF-8"));
                 for (NameValuePair element : nameValuePairs) {
                     params.put(element.getName(), element.getValue());
@@ -200,30 +208,38 @@ public final class UtilHttp {
         return value.length == 1 ? value[0] : Arrays.asList(value);
     }
 
-    public static Map<String, Object> getMultiPartParameterMap(HttpServletRequest request) {
+    public static JakartaServletFileUpload<DiskFileItem, DiskFileItemFactory> getServletFileUpload(HttpServletRequest request) {
+        Delegator delegator = (Delegator) request.getAttribute("delegator");
+        long maxUploadSize = getMaxUploadSize(delegator);
+        int sizeThreshold = getSizeThreshold(delegator);
+        File tmpUploadRepository = getTmpUploadRepository(delegator);
+        DiskFileItemFactory factory = DiskFileItemFactory.builder()
+                .setBufferSizeMax(sizeThreshold)
+                .setPath(tmpUploadRepository.getPath())
+                .get();
+        JakartaServletFileUpload<DiskFileItem, DiskFileItemFactory> upload = new JakartaServletFileUpload<>(factory);
+        upload.setSizeMax(maxUploadSize);
+        return upload;
+    }
+
+    public static Map<String, Object> getMultiPartParameterMap(HttpServletRequest request) throws FileUploadException {
         Map<String, Object> multiPartMap = new HashMap<>();
         Delegator delegator = (Delegator) request.getAttribute("delegator");
         HttpSession session = request.getSession();
-        boolean isMultiPart = ServletFileUpload.isMultipartContent(request);
+        boolean isMultiPart = JakartaServletFileUpload.isMultipartContent(request);
         if (isMultiPart) {
-            long maxUploadSize = getMaxUploadSize(delegator);
-            int sizeThreshold = getSizeThreshold(delegator);
-            File tmpUploadRepository = getTmpUploadRepository(delegator);
-            String encoding = request.getCharacterEncoding();
-            // check for multipart content types which may have uploaded items
-
-            ServletFileUpload upload = new ServletFileUpload(new DiskFileItemFactory(sizeThreshold, tmpUploadRepository));
-            upload.setSizeMax(maxUploadSize);
             // create the progress listener and add it to the session
+            String encoding = request.getCharacterEncoding();
+            JakartaServletFileUpload<DiskFileItem, DiskFileItemFactory> upload = UtilHttp.getServletFileUpload(request);
             FileUploadProgressListener listener = new FileUploadProgressListener();
             upload.setProgressListener(listener);
             session.setAttribute("uploadProgressListener", listener);
 
             if (encoding != null) {
-                upload.setHeaderEncoding(encoding);
+                upload.setHeaderCharset(Charset.forName(encoding));
             }
 
-            List<FileItem> uploadedItems = null;
+            List<FileItem<DiskFileItem>> uploadedItems = null;
             try {
                 uploadedItems = UtilGenerics.cast(upload.parseRequest(request));
             } catch (FileUploadException e) {
@@ -231,7 +247,7 @@ public final class UtilHttp {
             }
             if (uploadedItems != null) {
                 request.setAttribute("fileItems", uploadedItems);
-                for (FileItem item : uploadedItems) {
+                for (FileItem<DiskFileItem> item : uploadedItems) {
                     String fieldName = item.getFieldName();
                     //byte[] itemBytes = item.get();
                     /*
@@ -254,9 +270,9 @@ public final class UtilHttp {
                         } else {
                             if (encoding != null) {
                                 try {
-                                    multiPartMap.put(fieldName, item.getString(encoding));
-                                } catch (java.io.UnsupportedEncodingException uee) {
-                                    Debug.logError(uee, "Unsupported Encoding, using deafault", MODULE);
+                                    multiPartMap.put(fieldName, item.getString(Charset.forName(encoding)));
+                                } catch (IOException e) {
+                                    Debug.logError(e, "Unsupported Encoding, using deafault", MODULE);
                                     multiPartMap.put(fieldName, item.getString());
                                 }
                             } else {
@@ -412,14 +428,19 @@ public final class UtilHttp {
                 if (stringValues.length > 0 && !paramEntry.getKey().equals("DUMMYPAGE")) {
                     for (String s : stringValues) {
                         // if the string contains only an URL beginning by http or ftp => no change to keep special chars
-                        if (UtilValidate.isValidUrl(s) && (s.indexOf("://") == 4 || s.indexOf("://") == 3)) {
+                        if (UtilValidate.isValidUrl(s)) {
                             params = params + s + " ";
-                        } else if (UtilValidate.isUrl(s) && !s.isEmpty()) {
+                        } else if (UtilValidate.isUrlInString(s) && !s.isEmpty()) {
                             // if the string contains not only an URL => concatenate possible canonicalized before and after, w/o changing the URL
-                            String url = extractUrls(s).get(0); // There should be only 1 URL in a block, makes no sense else
-                            int start = s.indexOf(url);
-                            String after = (String) s.subSequence(start + url.length(), s.length());
-                            params = params + canonicalizeParameter((String) s.subSequence(0, start)) + url + canonicalizeParameter(after) + " ";
+                            List<String> extractedUrls = extractUrls(s);
+                            if (!extractedUrls.isEmpty()) {
+                                String url = extractedUrls.get(0); // There should be only 1 URL in a block, makes no sense else
+                                int start = s.indexOf(url);
+                                String after = (String) s.subSequence(start + url.length(), s.length());
+                                params = params + canonicalizeParameter((String) s.subSequence(0, start)) + url + canonicalizeParameter(after) + " ";
+                            } else {
+                                params = params + canonicalizeParameter(s) + " ";
+                            }
                         } else {
                             // Simple string to canonicalize
                             params = params + canonicalizeParameter(s) + " ";
@@ -1622,7 +1643,7 @@ public final class UtilHttp {
     public static boolean isJavaScriptEnabled(HttpServletRequest request) {
         HttpSession session = request.getSession();
         Boolean javaScriptEnabled = (Boolean) session.getAttribute("javaScriptEnabled");
-        return javaScriptEnabled != null ? javaScriptEnabled : false;
+        return javaScriptEnabled != null ? javaScriptEnabled : true;
     }
 
     /**
@@ -1758,9 +1779,7 @@ public final class UtilHttp {
 
         Pattern pattern = Pattern.compile(
                 "\\b(((ht|f)tp(s?)\\:\\/\\/|~\\/|\\/)|www.)"
-                        + "(\\w+:\\w+@)?(([-\\w]+\\.)+(com|org|net|gov"
-                        + "|mil|biz|info|mobi|name|aero|jobs|museum"
-                        + "|travel|[a-z]{2}))(:[\\d]{1,5})?"
+                        + "(\\w+:\\w+@)?(([-\\w]+\\.)+([a-zA-Z]{2,}))(:[\\d]{1,5})?"
                         + "(((\\/([-\\w~!$+|.,=]|%[a-f\\d]{2})+)+|\\/)+|\\?|#)?"
                         + "((\\?([-\\w~!$+|.,*:]|%[a-f\\d{2}])+=?"
                         + "([-\\w~!$+|.,*:=]|%[a-f\\d]{2})*)"
@@ -1778,7 +1797,10 @@ public final class UtilHttp {
         if (result.isEmpty()) {
             Matcher matcher = pattern.matcher(input);
             while (matcher.find()) {
-                result.add(matcher.group());
+                String candidate = matcher.group();
+                if (UtilValidate.isValidUrl(candidate)) {
+                    result.add(candidate);
+                }
             }
         }
 

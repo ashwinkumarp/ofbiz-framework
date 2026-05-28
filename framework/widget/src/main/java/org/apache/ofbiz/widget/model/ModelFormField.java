@@ -36,6 +36,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -289,7 +290,9 @@ public final class ModelFormField {
 
     public String getEntry(Map<String, ? extends Object> context, String defaultValue) {
         Boolean isError = (Boolean) context.get("isError");
-        Boolean useRequestParameters = (Boolean) context.get("useRequestParameters");
+        Boolean useRequestParametersGlobal = (Boolean) context.get("useRequestParameters");
+        Boolean useRequestParametersSpecific = (Boolean) context.get("useRequestParameters." + modelForm.getName());
+        Boolean useRequestParameters = useRequestParametersSpecific != null ? useRequestParametersSpecific : useRequestParametersGlobal;
 
         Locale locale = (Locale) context.get("locale");
         if (locale == null) {
@@ -304,8 +307,6 @@ public final class ModelFormField {
 
         String returnValue;
 
-        // if useRequestParameters is TRUE then parameters will always be used, if FALSE then parameters will never be used
-        // if isError is TRUE and useRequestParameters is not FALSE (ie is null or TRUE) then parameters will be used
         if ((Boolean.TRUE.equals(isError) && !Boolean.FALSE.equals(useRequestParameters))
                 || (Boolean.TRUE.equals(useRequestParameters))) {
             Map<String, Object> parameters = UtilGenerics.checkMap(context.get("parameters"), String.class, Object.class);
@@ -365,7 +366,7 @@ public final class ModelFormField {
             if (retVal != null) {
                 // format string based on the user's locale and time zone
                 if (retVal instanceof Double || retVal instanceof Float || retVal instanceof BigDecimal) {
-                    NumberFormat nf = NumberFormat.getInstance(locale);
+                    NumberFormat nf = NumberFormat.getInstance(Locale.getDefault());
                     nf.setMaximumFractionDigits(10);
                     return nf.format(retVal);
                 } else if (retVal instanceof java.sql.Date) {
@@ -1445,6 +1446,481 @@ public final class ModelFormField {
     }
 
     /**
+     * Models the &lt;date-range-picker&gt; element.
+     *
+     * @see <code>widget-form.xsd</code>
+     */
+    public static class DateRangePickerField extends FieldInfo {
+        private final Boolean alwaysShowCalendars;
+        private final FlexibleStringExpander applyButtonClasses;
+        private final FlexibleStringExpander applyLabel;
+        private final Boolean autoApply;
+        private final FlexibleStringExpander buttonClasses;
+        private final FlexibleStringExpander cancelButtonClasses;
+        private final FlexibleStringExpander cancelLabel;
+        private final FlexibleStringExpander clearTitle;
+        private final FlexibleStringExpander defaultValue;
+        private final String drops;
+        private final Boolean linkedCalendars;
+        private final Integer maxSpan;
+        private final Integer maxYear;
+        private final Integer minYear;
+        private final String opens;
+        private final Boolean showDropdowns;
+        private final Boolean showIsoWeekNumbers;
+        private final Boolean showRanges;
+        private final Boolean showWeekNumbers;
+        private final Boolean singleDatePicker;
+        private final Boolean timePicker;
+        private final Integer timePickerIncrement;
+        private final Boolean timePicker24Hour;
+        private final Boolean timePickerSeconds;
+
+        /**
+         * Gets alwaysShowCalendars
+         * @return alwaysShowCalendars
+         */
+        public Boolean getAlwaysShowCalendars() {
+            return alwaysShowCalendars;
+        }
+
+        /**
+         * Gets applyButtonClasses
+         * @return applyButtonClasses
+         */
+        public FlexibleStringExpander getApplyButtonClasses() {
+            return applyButtonClasses;
+        }
+
+        /**
+         * Gets applyButtonClasses
+         * @return applyButtonClasses
+         */
+        public String getApplyButtonClasses(Map<String, Object> context) {
+            if (this.applyButtonClasses != null) {
+                return this.applyButtonClasses.expandString(context);
+            }
+            return "";
+        }
+
+        /**
+         * Gets applyLabel
+         * @return applyLabel
+         */
+        public FlexibleStringExpander getApplyLabel() {
+            return applyLabel;
+        }
+
+        /**
+         * Gets applyLabel
+         * @return applyLabel
+         */
+        public String getApplyLabel(Map<String, Object> context) {
+            if (this.applyLabel != null) {
+                return this.applyLabel.expandString(context);
+            }
+            return "";
+        }
+
+        /**
+         * Gets autoApply
+         * @return autoApply
+         */
+        public Boolean getAutoApply() {
+            return autoApply;
+        }
+
+        /**
+         * Gets buttonClasses
+         * @return buttonClasses
+         */
+        public FlexibleStringExpander getButtonClasses() {
+            return buttonClasses;
+        }
+
+        /**
+         * Gets buttonClasses
+         * @return String buttonClasses
+         */
+        public String getButtonClasses(Map<String, Object> context) {
+            if (this.buttonClasses != null) {
+                return this.buttonClasses.expandString(context);
+            }
+            return "";
+        }
+
+        /**
+         * Gets cancelButtonClasses
+         * @return cancelButtonClasses
+         */
+        public FlexibleStringExpander getCancelButtonClasses() {
+            return cancelButtonClasses;
+        }
+
+        /**
+         * Gets cancelButtonClasses
+         * @return cancelButtonClasses
+         */
+        public String getCancelButtonClasses(Map<String, Object> context) {
+            if (this.cancelButtonClasses != null) {
+                return this.cancelButtonClasses.expandString(context);
+            }
+            return "";
+        }
+
+        /**
+         * Gets cancelLabel
+         * @return cancelLabel
+         */
+        public FlexibleStringExpander getCancelLabel() {
+            return cancelLabel;
+        }
+
+        /**
+         * Gets cancelLabel
+         * @return cancelLabel
+         */
+        public String getCancelLabel(Map<String, Object> context) {
+            if (this.cancelLabel != null) {
+                return this.cancelLabel.expandString(context);
+            }
+            return "";
+        }
+
+        /**
+         * Gets clearTitle
+         * @return clearTitle
+         */
+        public FlexibleStringExpander getClearTitle() {
+            return clearTitle;
+        }
+
+        /**
+         * Gets clearTitle
+         * @return clearTitle
+         */
+        public String getClearTitle(Map<String, Object> context) {
+            if (this.clearTitle != null) {
+                return this.clearTitle.expandString(context);
+            }
+            return "";
+        }
+
+        /**
+         * Gets defaultValue
+         * @return defaultValue
+         */
+        public FlexibleStringExpander getDefaultValue() {
+            return defaultValue;
+        }
+
+        /**
+         * Gets defaultValue
+         * @return defaultValue
+         */
+        public String getDefaultValue(Map<String, Object> context) {
+            if (this.defaultValue != null) {
+                return this.defaultValue.expandString(context);
+            }
+            return "";
+        }
+
+        /**
+         * Gets drops
+         * @return drops
+         */
+        public String getDrops() {
+            return drops;
+        }
+
+        /**
+         * Gets linkedCalendars
+         * @return linkedCalendars
+         */
+        public Boolean getLinkedCalendars() {
+            return linkedCalendars;
+        }
+
+        /**
+         * Gets maxSpan
+         * @return maxSpan
+         */
+        public Integer getMaxSpan() {
+            return maxSpan;
+        }
+
+        /**
+         * Gets maxYear
+         * @return maxYear
+         */
+        public Integer getMaxYear() {
+            return maxYear;
+        }
+
+        /**
+         * Gets minYear
+         * @return minYear
+         */
+        public Integer getMinYear() {
+            return minYear;
+        }
+
+        /**
+         * Gets opens
+         * @return opens
+         */
+        public String getOpens() {
+            return opens;
+        }
+
+        /**
+         * Gets showDropdowns
+         * @return showDropdowns
+         */
+        public Boolean getShowDropdowns() {
+            return showDropdowns;
+        }
+
+        /**
+         * Gets showRanges
+         * @return showRanges
+         */
+        public Boolean getShowRanges() {
+            return showRanges;
+        }
+
+        /**
+         * Gets showWeekNumbers
+         * @return showWeekNumbers
+         */
+        public Boolean getShowWeekNumbers() {
+            return showWeekNumbers;
+        }
+
+        /**
+         * Gets showIsoWeekNumbers
+         * @return showIsoWeekNumbers
+         */
+        public Boolean getShowIsoWeekNumbers() {
+            return showIsoWeekNumbers;
+        }
+
+        /**
+         * Gets singleDatePicker
+         * @return singleDatePicker
+         */
+        public Boolean getSingleDatePicker() {
+            return singleDatePicker;
+        }
+
+        /**
+         * Gets timePicker
+         * @return timePicker
+         */
+        public Boolean getTimePicker() {
+            return timePicker;
+        }
+
+        /**
+         * Gets timePicker24Hour
+         * @return timePicker24Hour
+         */
+        public Boolean getTimePicker24Hour() {
+            return timePicker24Hour;
+        }
+
+        /**
+         * Gets timePickerIncrement
+         * @return timePickerIncrement
+         */
+        public Integer getTimePickerIncrement() {
+            return timePickerIncrement;
+        }
+
+        /**
+         * Gets timePickerSeconds
+         * @return timePickerSeconds
+         */
+        public Boolean getTimePickerSeconds() {
+            return timePickerSeconds;
+        }
+
+        protected DateRangePickerField(DateRangePickerField original, ModelFormField modelFormField) {
+            super(original.getFieldSource(), original.getFieldType(), modelFormField);
+            this.alwaysShowCalendars = original.alwaysShowCalendars;
+            this.applyButtonClasses = original.applyButtonClasses;
+            this.applyLabel = original.applyLabel;
+            this.autoApply = original.autoApply;
+            this.buttonClasses = original.buttonClasses;
+            this.cancelButtonClasses = original.cancelButtonClasses;
+            this.cancelLabel = original.cancelLabel;
+            this.clearTitle = original.clearTitle;
+            this.defaultValue = original.defaultValue;
+            this.drops = original.drops;
+            this.linkedCalendars = original.linkedCalendars;
+            this.maxSpan = original.maxSpan;
+            this.maxYear = original.maxYear;
+            this.minYear = original.minYear;
+            this.opens = original.opens;
+            this.showDropdowns = original.showDropdowns;
+            this.showIsoWeekNumbers = original.showIsoWeekNumbers;
+            this.showRanges = original.showRanges;
+            this.showWeekNumbers = original.showWeekNumbers;
+            this.singleDatePicker = original.singleDatePicker;
+            this.timePicker = original.timePicker;
+            this.timePicker24Hour = original.timePicker24Hour;
+            this.timePickerIncrement = original.timePickerIncrement;
+            this.timePickerSeconds = original.timePickerSeconds;
+        }
+
+        public DateRangePickerField(Element element, ModelFormField modelFormField) {
+            super(element, modelFormField);
+            this.alwaysShowCalendars = !"false".equals(element.getAttribute("always-show-calendars"));
+            this.applyButtonClasses = FlexibleStringExpander.getInstance(element.getAttribute("apply-button-classes"));
+            this.applyLabel = FlexibleStringExpander.getInstance(element.getAttribute("apply-label"));
+            this.autoApply = !"false".equals(element.getAttribute("auto-apply"));
+            this.buttonClasses = FlexibleStringExpander.getInstance(element.getAttribute("button-classes"));
+            this.cancelButtonClasses = FlexibleStringExpander.getInstance(element.getAttribute("cancel-button-classes"));
+            this.cancelLabel = FlexibleStringExpander.getInstance(element.getAttribute("cancel-label"));
+            this.clearTitle = FlexibleStringExpander.getInstance(element.getAttribute("clear-title"));
+            this.defaultValue = FlexibleStringExpander.getInstance(element.getAttribute("default-value"));
+            this.drops = element.getAttribute("drops");
+            this.linkedCalendars = !"false".equals(element.getAttribute("linked-calendars"));
+
+            Integer maxSpan = null;
+            String maxSpanStr = element.getAttribute("max-span");
+            if (!maxSpanStr.isEmpty()) {
+                try {
+                    maxSpan = Integer.valueOf(maxSpanStr);
+                } catch (NumberFormatException e) {
+                    Debug.logError("Could not parse the max-span value of the text element: [" + maxSpanStr
+                            + "], setting to null; default of no maxYear will be used", MODULE);
+                }
+            }
+            this.maxSpan = maxSpan;
+
+            Integer maxYear = null;
+            String maxYearStr = element.getAttribute("max-year");
+            if (!maxYearStr.isEmpty()) {
+                try {
+                    maxYear = Integer.valueOf(maxYearStr);
+                } catch (NumberFormatException e) {
+                    Debug.logError("Could not parse the max-year value of the text element: [" + maxYearStr
+                            + "], setting to null; default of no maxYear will be used", MODULE);
+                }
+            }
+            this.maxYear = maxYear;
+
+            Integer minYear = null;
+            String minYearStr = element.getAttribute("min-year");
+            if (!minYearStr.isEmpty()) {
+                try {
+                    minYear = Integer.valueOf(minYearStr);
+                } catch (NumberFormatException e) {
+                    Debug.logError("Could not parse the min-year value of the text element: [" + minYearStr
+                            + "], setting to null; default of no minYear will be used", MODULE);
+                }
+            }
+            this.minYear = minYear;
+
+            this.opens = element.getAttribute("opens");
+            this.showDropdowns = !"false".equals(element.getAttribute("show-dropdowns"));
+            this.showIsoWeekNumbers = !"false".equals(element.getAttribute("show-iso-week-numbers"));
+            this.showRanges = !"false".equals(element.getAttribute("show-ranges"));
+            this.showWeekNumbers = !"false".equals(element.getAttribute("show-week-numbers"));
+            this.singleDatePicker = !"false".equals(element.getAttribute("single-date-picker"));
+            this.timePicker = !"false".equals(element.getAttribute("time-picker"));
+            this.timePicker24Hour = !"false".equals(element.getAttribute("time-picker-24-hour"));
+
+            Integer timePickerIncrement = null;
+            String timePickerIncrementStr = element.getAttribute("time-picker-increment");
+            if (!timePickerIncrementStr.isEmpty()) {
+                try {
+                    timePickerIncrement = Integer.valueOf(timePickerIncrementStr);
+                } catch (NumberFormatException e) {
+                    Debug.logError("Could not parse the time-picker-increment value of the text element: [" + timePickerIncrementStr
+                            + "], setting to null; default of no timePickerIncrement will be used", MODULE);
+                }
+            }
+            this.timePickerIncrement = timePickerIncrement;
+
+            this.timePickerSeconds = !"false".equals(element.getAttribute("time-picker-seconds"));
+        }
+
+        public DateRangePickerField(int fieldSource, Boolean timePicker) {
+            super(fieldSource, FieldInfo.DATE_RANGE_PICKER, null);
+            this.alwaysShowCalendars = true;
+            this.applyButtonClasses = FlexibleStringExpander.getInstance("");
+            this.applyLabel = FlexibleStringExpander.getInstance("");
+            this.autoApply = true;
+            this.buttonClasses = FlexibleStringExpander.getInstance("");
+            this.cancelButtonClasses = FlexibleStringExpander.getInstance("");
+            this.cancelLabel = FlexibleStringExpander.getInstance("");
+            this.clearTitle = FlexibleStringExpander.getInstance("");
+            this.defaultValue = FlexibleStringExpander.getInstance("");
+            this.drops = "down";
+            this.linkedCalendars = true;
+            this.maxSpan = null;
+            this.maxYear = null;
+            this.minYear = null;
+            this.opens = "center";
+            this.showDropdowns = true;
+            this.showIsoWeekNumbers = false;
+            this.showRanges = true;
+            this.showWeekNumbers = false;
+            this.singleDatePicker = false;
+            this.timePicker = timePicker;
+            this.timePicker24Hour = true;
+            this.timePickerIncrement = null;
+            this.timePickerSeconds = false;
+        }
+
+        public DateRangePickerField(ModelFormField modelFormField) {
+            super(FieldInfo.SOURCE_EXPLICIT, FieldInfo.DATE_RANGE_PICKER, modelFormField);
+            this.alwaysShowCalendars = true;
+            this.applyButtonClasses = FlexibleStringExpander.getInstance("");
+            this.applyLabel = FlexibleStringExpander.getInstance("");
+            this.autoApply = true;
+            this.buttonClasses = FlexibleStringExpander.getInstance("");
+            this.cancelButtonClasses = FlexibleStringExpander.getInstance("");
+            this.cancelLabel = FlexibleStringExpander.getInstance("");
+            this.clearTitle = FlexibleStringExpander.getInstance("");
+            this.defaultValue = FlexibleStringExpander.getInstance("");
+            this.drops = "down";
+            this.linkedCalendars = true;
+            this.maxSpan = null;
+            this.maxYear = null;
+            this.minYear = null;
+            this.opens = "center";
+            this.showDropdowns = true;
+            this.showIsoWeekNumbers = false;
+            this.showRanges = true;
+            this.showWeekNumbers = false;
+            this.singleDatePicker = false;
+            this.timePicker = false;
+            this.timePicker24Hour = true;
+            this.timePickerIncrement = null;
+            this.timePickerSeconds = false;
+        }
+
+        @Override
+        public void accept(ModelFieldVisitor visitor) throws Exception {
+            visitor.visit(this);
+        }
+
+        @Override
+        public FieldInfo copy(ModelFormField modelFormField) {
+            return new DateRangePickerField(this, modelFormField);
+        }
+
+        @Override
+        public void renderFieldString(Appendable writer, Map<String, Object> context, FormStringRenderer formStringRenderer)
+                throws IOException {
+            formStringRenderer.renderDateRangePickerField(writer, context, this);
+        }
+    }
+
+    /**
      * Models the &lt;display-entity&gt; element.
      * @see <code>widget-form.xsd</code>
      */
@@ -1776,12 +2252,9 @@ public final class ModelFormField {
          * @return the description
          */
         public String getDescription(Map<String, Object> context) {
-            String retVal = null;
-            if (UtilValidate.isNotEmpty(this.description)) {
-                retVal = this.description.expandString(context);
-            } else {
-                retVal = getModelFormField().getEntry(context);
-            }
+            String retVal = UtilValidate.isNotEmpty(this.description)
+                    ? this.description.expandString(context)
+                    : getModelFormField().getEntry(context);
 
             if (UtilValidate.isEmpty(retVal)) {
                 retVal = this.getDefaultValue(context);
@@ -2184,6 +2657,160 @@ public final class ModelFormField {
     }
 
     /**
+     * Models the &lt;group-options&gt; element.
+     * @see <code>widget-form.xsd</code>
+     */
+    public static class GroupOptions {
+        private final FlexibleStringExpander description;
+        private final FlexibleStringExpander id;
+        private final FlexibleStringExpander widgetStyle;
+
+        private final List<OptionSource> optionSources;
+        private final List<GroupOptions> groupOptions;
+
+        /**
+         * Create a new groupOptions instance from xml element
+         * @param groupOptionsElement
+         * @param modelFormField
+         */
+        public GroupOptions(Element groupOptionsElement, ModelFormField modelFormField) {
+            super();
+            this.description = FlexibleStringExpander.getInstance(groupOptionsElement.getAttribute("description"));
+            this.id = FlexibleStringExpander.getInstance(groupOptionsElement.getAttribute("id"));
+            this.widgetStyle = FlexibleStringExpander.getInstance(groupOptionsElement.getAttribute("widgetStyle"));
+
+            List<? extends Element> childElements = UtilXml.childElementList(groupOptionsElement);
+            List<OptionSource> optionSources = new ArrayList<>();
+            List<GroupOptions> groupOptions = new ArrayList<>();
+            if (!childElements.isEmpty()) {
+                for (Element childElement : childElements) {
+                    switch (childElement.getLocalName()) {
+                    case "option":
+                        optionSources.add(new SingleOption(childElement, modelFormField));
+                        break;
+                    case "list-options":
+                        optionSources.add(new ListOptions(childElement, modelFormField));
+                        break;
+                    case "entity-options":
+                        optionSources.add(new EntityOptions(childElement, modelFormField));
+                        break;
+                    case "group-options":
+                        groupOptions.add(new GroupOptions(childElement, modelFormField));
+                        break;
+                    }
+                }
+            }
+            this.optionSources = Collections.unmodifiableList(optionSources);
+            this.groupOptions = Collections.unmodifiableList(groupOptions);
+        }
+
+        /**
+         * Copy an existing groupOptions to a new one
+         * @param original
+         * @param modelFormField
+         */
+        private GroupOptions(GroupOptions original, ModelFormField modelFormField) {
+            super();
+            this.description = original.description;
+            this.id = original.id;
+            this.widgetStyle = original.widgetStyle;
+            List<OptionSource> optionSources = new ArrayList<>(original.optionSources.size());
+            for (OptionSource source : original.optionSources) {
+                optionSources.add(source.copy(modelFormField));
+            }
+            this.optionSources = Collections.unmodifiableList(optionSources);
+            List<GroupOptions> groupOptions = new ArrayList<>(original.groupOptions.size());
+            for (GroupOptions group : original.groupOptions) {
+                groupOptions.add(group.copy(modelFormField));
+            }
+            this.groupOptions = Collections.unmodifiableList(groupOptions);
+        }
+
+        /**
+         * create a groupOptions from a modelFormField
+         * @param modelFormField
+         */
+        public GroupOptions(ModelFormField modelFormField) {
+            super();
+            this.description = FlexibleStringExpander.getInstance("");
+            this.id = FlexibleStringExpander.getInstance("");
+            this.widgetStyle = FlexibleStringExpander.getInstance("");
+            this.optionSources = Collections.emptyList();
+            this.groupOptions = Collections.emptyList();
+        }
+
+        /**
+         * @return description present for a groupOptions instance
+         */
+        public FlexibleStringExpander getDescription() {
+            return description;
+        }
+
+        /**
+         * @return parsed description with context for a groupOptions instance
+         */
+        public String getDescription(Map<String, Object> context) {
+            return this.description.expandString(context);
+        }
+
+        /**
+         * @return unique reference for a groupOptions instance
+         */
+        public FlexibleStringExpander getId() {
+            return id;
+        }
+
+        /**
+         * @return parsed unique reference with context for a groupOptions instance
+         */
+        public String getId(Map<String, Object> context) {
+            String id = this.id.expandString(context);
+            return UtilValidate.isNotEmpty(id) ? id
+                    : UUID.randomUUID().toString().replace("-", "");
+        }
+
+        /**
+         * @return widgetStyle present for a groupOptions instance
+         */
+        public FlexibleStringExpander getWidgetStyle() {
+            return widgetStyle;
+        }
+
+        /**
+         * @return parsed widgetStyle with context for a groupOptions instance
+         */
+        public String getWidgetStyle(Map<String, Object> context) {
+            return this.widgetStyle.expandString(context);
+        }
+
+        /**
+         * Compute all options define for groupOptions instance
+         * @return options list present on this groupOptions
+         */
+        public List<OptionValue> getAllOptionValues(Map<String, Object> context, Delegator delegator) {
+            List<OptionValue> optionValues = new LinkedList<>();
+            for (OptionSource optionSource : this.optionSources) {
+                optionSource.addOptionValues(optionValues, context, delegator);
+            }
+            return optionValues;
+        }
+        /**
+         * @return groupOptions sub list
+         */
+        public List<GroupOptions> getGroupOptions() {
+            return groupOptions;
+        }
+
+        /**
+         * Duplicate the groupOptions
+         * @return new groupOptions instance
+         */
+        public GroupOptions copy(ModelFormField modelFormField) {
+            return new GroupOptions(this, modelFormField);
+        }
+    }
+
+    /**
      * Models the &lt;entity-options&gt; element.
      * @see <code>widget-form.xsd</code>
      */
@@ -2409,12 +3036,14 @@ public final class ModelFormField {
 
         private final FlexibleStringExpander noCurrentSelectedKey;
         private final List<OptionSource> optionSources;
+        private final List<GroupOptions> groupOptions;
 
         public FieldInfoWithOptions(Element element, ModelFormField modelFormField) {
             super(element, modelFormField);
             this.noCurrentSelectedKey = FlexibleStringExpander.getInstance(element.getAttribute("no-current-selected-key"));
             // read all option and entity-options sub-elements, maintaining order
             ArrayList<OptionSource> optionSources = new ArrayList<>();
+            ArrayList<GroupOptions> groupSources = new ArrayList<>();
             List<? extends Element> childElements = UtilXml.childElementList(element);
             if (!childElements.isEmpty()) {
                 for (Element childElement : childElements) {
@@ -2425,6 +3054,8 @@ public final class ModelFormField {
                         optionSources.add(new ListOptions(childElement, modelFormField));
                     } else if ("entity-options".equals(childName)) {
                         optionSources.add(new EntityOptions(childElement, modelFormField));
+                    } else if ("group-options".equals(childName)) {
+                        groupSources.add(new GroupOptions(childElement, modelFormField));
                     }
                 }
             } else {
@@ -2433,6 +3064,7 @@ public final class ModelFormField {
             }
             optionSources.trimToSize();
             this.optionSources = Collections.unmodifiableList(optionSources);
+            this.groupOptions = Collections.unmodifiableList(groupSources);
         }
 
         // Copy constructor.
@@ -2448,18 +3080,25 @@ public final class ModelFormField {
                 }
                 this.optionSources = Collections.unmodifiableList(optionSources);
             }
+            List<GroupOptions> groupOptions = new ArrayList<>(original.groupOptions.size());
+            for (GroupOptions group: original.groupOptions) {
+                groupOptions.add(group.copy(modelFormField));
+            }
+            this.groupOptions = groupOptions;
         }
 
         protected FieldInfoWithOptions(int fieldSource, int fieldType, List<OptionSource> optionSources) {
             super(fieldSource, fieldType, null);
             this.noCurrentSelectedKey = FlexibleStringExpander.getInstance("");
             this.optionSources = Collections.unmodifiableList(new ArrayList<>(optionSources));
+            this.groupOptions = Collections.emptyList();
         }
 
         public FieldInfoWithOptions(int fieldSource, int fieldType, ModelFormField modelFormField) {
             super(fieldSource, fieldType, modelFormField);
             this.noCurrentSelectedKey = FlexibleStringExpander.getInstance("");
             this.optionSources = Collections.emptyList();
+            this.groupOptions = Collections.emptyList();
         }
 
         /**
@@ -2499,6 +3138,13 @@ public final class ModelFormField {
          */
         public List<OptionSource> getOptionSources() {
             return optionSources;
+        }
+        /**
+         * Gets group options.
+         * @return the group options
+         */
+        public List<GroupOptions> getGroupOptions() {
+            return groupOptions;
         }
     }
 
@@ -4894,7 +5540,7 @@ public final class ModelFormField {
 
         } catch (CompilationFailedException e) {
             String errMsg =
-                    "Error evaluating BeanShell ignore-when condition [" + ignoreWhen + "] on the field " + this.name + " of form "
+                    "Error evaluating ignore-when condition [" + ignoreWhen + "] on the field " + this.name + " of form "
                             + this.modelForm.getName() + ": " + e.toString();
             Debug.logError(e, errMsg, MODULE);
             throw new IllegalArgumentException(errMsg);
@@ -5267,12 +5913,22 @@ public final class ModelFormField {
         private final boolean readonly;
         private final int size;
         private final SubHyperlink subHyperlink;
+        private final String type;
+        private final String pattern;
+        private final String step;
+        private final String min;
+        private final String max;
 
         public TextField(Element element, ModelFormField modelFormField) {
             super(element, modelFormField);
             this.clientAutocompleteField = !"false".equals(element.getAttribute("client-autocomplete-field"));
             this.defaultValue = FlexibleStringExpander.getInstance(element.getAttribute("default-value"));
             this.mask = element.getAttribute("mask");
+            this.type = element.getAttribute("type");
+            this.pattern = element.getAttribute("pattern");
+            this.step = element.getAttribute("step");
+            this.min = element.getAttribute("min");
+            this.max = element.getAttribute("max");
             Integer maxlength = null;
             String maxlengthStr = element.getAttribute("maxlength");
             if (!maxlengthStr.isEmpty()) {
@@ -5310,6 +5966,11 @@ public final class ModelFormField {
             this.clientAutocompleteField = true;
             this.defaultValue = FlexibleStringExpander.getInstance("");
             this.mask = "";
+            this.type = "";
+            this.pattern = "";
+            this.step = "";
+            this.min = "";
+            this.max = "";
             this.maxlength = maxlength;
             this.placeholder = FlexibleStringExpander.getInstance("");
             this.readonly = false;
@@ -5317,11 +5978,16 @@ public final class ModelFormField {
             this.subHyperlink = null;
         }
 
-        protected TextField(int fieldSource, int size, Integer maxlength, ModelFormField modelFormField) {
+        protected TextField(int fieldSource, int size, Integer maxlength, String type, ModelFormField modelFormField) {
             super(fieldSource, FieldInfo.TEXT, modelFormField);
             this.clientAutocompleteField = true;
             this.defaultValue = FlexibleStringExpander.getInstance("");
             this.mask = "";
+            this.type = type;
+            this.pattern = "";
+            this.step = "";
+            this.min = "";
+            this.max = "";
             this.maxlength = maxlength;
             this.placeholder = FlexibleStringExpander.getInstance("");
             this.readonly = false;
@@ -5334,6 +6000,11 @@ public final class ModelFormField {
             this.clientAutocompleteField = true;
             this.defaultValue = FlexibleStringExpander.getInstance("");
             this.mask = "";
+            this.type = "";
+            this.pattern = "";
+            this.step = "";
+            this.min = "";
+            this.max = "";
             this.maxlength = null;
             this.placeholder = FlexibleStringExpander.getInstance("");
             this.readonly = false;
@@ -5354,6 +6025,11 @@ public final class ModelFormField {
             this.clientAutocompleteField = original.clientAutocompleteField;
             this.defaultValue = original.defaultValue;
             this.mask = original.mask;
+            this.type = original.type;
+            this.pattern = original.pattern;
+            this.step = original.step;
+            this.min = original.min;
+            this.max = original.max;
             this.placeholder = original.placeholder;
             this.size = original.size;
             this.maxlength = original.maxlength;
@@ -5465,6 +6141,46 @@ public final class ModelFormField {
                 throws IOException {
             formStringRenderer.renderTextField(writer, context, this);
         }
+
+        /**
+         * Gets type.
+         * @return the type
+         */
+        public String getType() {
+            return this.type;
+        }
+
+        /**
+         * Gets pattern.
+         * @return the pattern
+         */
+        public String getPattern() {
+            return this.pattern;
+        }
+
+        /**
+         * Gets step.
+         * @return the step
+         */
+        public String getStep() {
+            return this.step;
+        }
+
+        /**
+         * Gets min.
+         * @return the min
+         */
+        public String getMin() {
+            return this.min;
+        }
+
+        /**
+         * Gets max.
+         * @return the max
+         */
+        public String getMax() {
+            return this.max;
+        }
     }
 
     /**
@@ -5485,14 +6201,14 @@ public final class ModelFormField {
                 this.defaultOption = UtilProperties.getPropertyValue("widget", "widget.form.defaultTextFindOption", "contains");
             }
             this.hideIgnoreCase = "true".equals(element.getAttribute("hide-options"))
-                    || "ignore-case".equals(element.getAttribute("hide-options")) ? true : false;
+                || "ignore-case".equals(element.getAttribute("hide-options"));
             this.hideOptions = "true".equals(element.getAttribute("hide-options"))
-                    || "options".equals(element.getAttribute("hide-options")) ? true : false;
+                || "options".equals(element.getAttribute("hide-options"));
             this.ignoreCase = "true".equals(element.getAttribute("ignore-case"));
         }
 
         public TextFindField(int fieldSource, int size, Integer maxlength, ModelFormField modelFormField) {
-            super(fieldSource, size, maxlength, modelFormField);
+            super(fieldSource, size, maxlength, "", modelFormField);
             this.defaultOption = UtilProperties.getPropertyValue("widget", "widget.form.defaultTextFindOption", "contains");
             this.hideIgnoreCase = false;
             this.hideOptions = false;

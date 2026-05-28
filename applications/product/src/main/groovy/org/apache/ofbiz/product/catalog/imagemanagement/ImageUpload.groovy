@@ -69,7 +69,7 @@ context.tryEntity = tryEntity
 // UPLOADING STUFF
 forLock = new Object()
 contentType = null
-String fileType = request.getParameter('upload_file_type')
+String fileType = request.getParameter('up_load_file_type')
 if (fileType) {
     context.fileType = fileType
 
@@ -87,6 +87,12 @@ if (fileType) {
         contentType = '--' + contentType
     }
 
+    // Guard against path traversal: the resolved save directory must remain inside imageServerPath
+    if (!java.nio.file.Paths.get(imageServerPath + '/' + filePathPrefix).normalize()
+            .startsWith(java.nio.file.Paths.get(imageServerPath).normalize())) {
+        logError('Path traversal attempt detected in product image upload')
+        return error(UtilProperties.getMessage('SecurityUiLabels', 'SupportedImageFormats', locale))
+    }
     defaultFileName = filenameToUse + '_temp'
     uploadObject = new HttpRequestFileUpload()
     uploadObject.setOverrideFilename(defaultFileName)
